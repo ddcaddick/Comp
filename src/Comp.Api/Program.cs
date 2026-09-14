@@ -5,7 +5,9 @@ using Comp.Api.Security;
 using Comp.Application.Abstractions;
 using Comp.Application.Validation;
 using Comp.Infrastructure;
+using Comp.Infrastructure.Competitions;
 using Comp.Infrastructure.Identity;
+using Comp.Infrastructure.Leagues;
 using Comp.Infrastructure.Shooters;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -47,6 +49,8 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddScoped<JwtAccessTokenGenerator>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IShooterService, ShooterService>();
+builder.Services.AddScoped<ICompetitionService, CompetitionService>();
+builder.Services.AddScoped<ILeagueService, LeagueService>();
 builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 
 // Access tokens are short-lived (15 minutes); the mobile app stays signed in via a
@@ -116,6 +120,8 @@ app.MapGet("/health", () => Results.Ok(new
 
 app.MapAuthEndpoints();
 app.MapShooterEndpoints();
+app.MapCompetitionEndpoints();
+app.MapLeagueEndpoints();
 
 app.Run();
 
