@@ -170,11 +170,32 @@ Milestone M2 is complete. Delivered:
     bearer token — every authenticated write would have silently hit the audit
     interceptor's "no current user" guard. Fixed by setting `MapInboundClaims = false` in
     `Program.cs` and reading `sub` (falling back to `NameIdentifier`) in the accessor.
+- **Competition and league endpoints.** `GET/POST /competitions`,
+  `POST /competitions/{id}/close`, `GET/POST /competitions/{id}/leagues`,
+  `GET/PUT /leagues/{id}/members` — writes are Super Admin only, reads are any
+  authenticated role, per section K. Closing a competition is one-way (no reopen
+  endpoint); closing an already-closed one is a 409, not a silent no-op. A closed
+  competition also locks adding new leagues and changing membership in them.
+  `PUT /leagues/{id}/members` is a true full-replace: a shooter dropped from the list is
+  removed from that league outright (a membership row is current status, not a permanent
+  record like a run); a shooter already in a *different* league in the same competition is
+  moved rather than rejected — the no-mid-year-move rule only protects
+  `EventParticipant.LeagueId`'s historical snapshot, not the current `LeagueMembership`
+  row. Enforces the 20-member cap from the architecture doc's decision D4. Tested in
+  `tests/Comp.Api.Tests/CompetitionEndpointTests.cs` and `LeagueEndpointTests.cs`.
+  - Fixed along the way: `LeagueService`'s member-listing query did
+    `.Join(...).OrderBy(response => response.LastName)` — ordering on a property of an
+    already-projected record isn't translatable and threw at runtime (missed by the
+    build, only caught by the test actually calling the endpoint). Order on the raw
+    joined columns, then `.Select()` into the DTO — see `LoadMembersAsync`.
 
-Not yet built for M3: competitions, leagues, league memberships, and the web admin shell
-(`clients/web` doesn't exist yet). Promotion/relegation isn't in M3's scope per the roadmap
-(the acceptance criterion only requires shooters assigned across leagues, not promoted
-between competitions) — treat it as a later addition unless asked for explicitly.
+Not yet built for M3: the web admin shell (`clients/web` doesn't exist yet — the schema,
+service and endpoint work is otherwise done). Promotion/relegation isn't in M3's scope per
+the roadmap (the acceptance criterion only requires shooters assigned across leagues, not
+promoted between competitions) — treat it as a later addition unless asked for explicitly.
+There's also no "activate" transition for a competition (Planning → Active) — the API
+design doesn't call for one, so competitions stay in `Planning` until something needs
+`Active` specifically.
 
 Not yet built past M3: events/squads, the scoring engine, result entry, standings.
 
