@@ -142,9 +142,43 @@ Milestone M2 is complete. Delivered:
   the committed `api-types.ts`. If a PR changes a `Comp.Contracts` DTO or an endpoint's
   shape, run `npm run generate` in `tools/generate-api-types` and commit the result.
 
-Not yet built: everything past M2 — shooter CRUD, competitions/leagues, events/squads, the
-scoring engine, result entry, standings.
+**Milestone M3 (register, competitions, leagues) is in progress.** Delivered so far:
 
-Do not build admin screens yet, and do not build a competition-data write endpoint before
-deciding how it authenticates — the audit interceptor throws if `SaveChangesAsync` runs with
-no current user (and no `PendingActorOverride`), by design.
+- **Shooter endpoints.** `GET /shooters` (search — `q`, `active`, `recentFirst`; any
+  authenticated role), `GET /shooters/{id}/history` (audit trail; any authenticated role),
+  `POST /shooters` (Super Admin/Admin/Official), `PATCH /shooters/{id}`,
+  `POST /shooters/{id}/deactivate`, `POST /shooters/{id}/reactivate` (Super Admin/Admin
+  only), matching the security model in the architecture doc's section K. The search query
+  is written to match `ix_shooters_search`'s indexed expression exactly (verified with
+  `EXPLAIN`/`enable_seqscan = off` that the index is actually usable by it — Postgres
+  correctly prefers a seq scan at the current tiny table size, which is not a bug).
+  `active` is not filtered by default (only the future participant-selection workflow
+  should default to active-only, per `docs/m2-wiring.md`'s "what is deliberately absent").
+  `recentFirst` currently just means "recently created"; it should probably mean
+  "recently entered in an event" once M6 (events, participants) exists. Deactivate/
+  reactivate are idempotent and don't audit a no-op. Tested end-to-end, including the
+  mandatory negative authorization cases (an Official must not edit/deactivate a shooter,
+  a Read-only user must not write at all), in
+  `tests/Comp.Api.Tests/ShooterEndpointTests.cs`.
+  - `Comp.Api/Endpoints/` now holds one static class per resource
+    (`MapAuthEndpoints`/`MapShooterEndpoints`) registered from `Program.cs`, rather than
+    endpoints living inline — follow this pattern for the next resource.
+  - Fixed along the way: `HttpContextCurrentUserAccessor` was reading
+    `ClaimTypes.NameIdentifier`, but `JwtAccessTokenGenerator` only ever issued a `sub`
+    claim, and whether the JWT bearer handler remaps one to the other depends on
+    `MapInboundClaims`. This was never exercised until an endpoint actually required a
+    bearer token — every authenticated write would have silently hit the audit
+    interceptor's "no current user" guard. Fixed by setting `MapInboundClaims = false` in
+    `Program.cs` and reading `sub` (falling back to `NameIdentifier`) in the accessor.
+
+Not yet built for M3: competitions, leagues, league memberships, and the web admin shell
+(`clients/web` doesn't exist yet). Promotion/relegation isn't in M3's scope per the roadmap
+(the acceptance criterion only requires shooters assigned across leagues, not promoted
+between competitions) — treat it as a later addition unless asked for explicitly.
+
+Not yet built past M3: events/squads, the scoring engine, result entry, standings.
+
+Do not build admin screens without checking in first — `clients/web` doesn't exist yet and
+is a substantial scaffold, not a quick addition. Do not build a competition-data write
+endpoint before deciding how it authenticates — the audit interceptor throws if
+`SaveChangesAsync` runs with no current user (and no `PendingActorOverride`), by design.

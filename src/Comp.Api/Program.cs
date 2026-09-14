@@ -1,12 +1,12 @@
 using System.Text;
 using System.Threading.RateLimiting;
+using Comp.Api.Endpoints;
 using Comp.Api.Security;
-using Comp.Api.Validation;
 using Comp.Application.Abstractions;
 using Comp.Application.Validation;
-using Comp.Contracts.Auth;
 using Comp.Infrastructure;
 using Comp.Infrastructure.Identity;
+using Comp.Infrastructure.Shooters;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -46,6 +46,7 @@ builder.Services
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddScoped<JwtAccessTokenGenerator>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IShooterService, ShooterService>();
 builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 
 // Access tokens are short-lived (15 minutes); the mobile app stays signed in via a
@@ -55,6 +56,10 @@ builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        // Keep claim types exactly as JwtAccessTokenGenerator issued them (e.g. "sub"
+        // rather than a remapped ClaimTypes.NameIdentifier) so there is one unambiguous
+        // name to read them back by, regardless of handler defaults.
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -109,35 +114,8 @@ app.MapGet("/health", () => Results.Ok(new
     at = DateTimeOffset.UtcNow
 }));
 
-var auth = app.MapGroup("/auth");
-
-auth.MapPost("/login", async (LoginRequest request, IAuthService authService, CancellationToken ct) =>
-        (await authService.LoginAsync(request, ct)) switch
-        {
-            AuthResult.Success success => Results.Ok(success.Tokens),
-            AuthResult.Failure failure => Results.Problem(detail: failure.Reason, statusCode: StatusCodes.Status401Unauthorized),
-            _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
-        })
-    .AddEndpointFilter<ValidationFilter<LoginRequest>>()
-    .RequireRateLimiting("auth")
-    .AllowAnonymous()
-    .Produces<TokenResponse>()
-    .ProducesValidationProblem()
-    .ProducesProblem(StatusCodes.Status401Unauthorized);
-
-auth.MapPost("/refresh", async (RefreshRequest request, IAuthService authService, CancellationToken ct) =>
-        (await authService.RefreshAsync(request, ct)) switch
-        {
-            AuthResult.Success success => Results.Ok(success.Tokens),
-            AuthResult.Failure failure => Results.Problem(detail: failure.Reason, statusCode: StatusCodes.Status401Unauthorized),
-            _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
-        })
-    .AddEndpointFilter<ValidationFilter<RefreshRequest>>()
-    .RequireRateLimiting("auth")
-    .AllowAnonymous()
-    .Produces<TokenResponse>()
-    .ProducesValidationProblem()
-    .ProducesProblem(StatusCodes.Status401Unauthorized);
+app.MapAuthEndpoints();
+app.MapShooterEndpoints();
 
 app.Run();
 
