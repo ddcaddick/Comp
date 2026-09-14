@@ -135,14 +135,20 @@ Milestone M2 is complete. Delivered:
 - **OpenAPI type generation in CI.** `Comp.Api` writes its OpenAPI document to
   `/openapi/Comp.Api.json` as a build step (`Microsoft.Extensions.ApiDescription.Server`,
   configured via `OpenApiDocumentsDirectory` in `Comp.Api.csproj` — gitignored, regenerated
-  every build). `tools/generate-api-types` turns that into `clients/mobile/api/api-types.ts`
-  via `openapi-typescript`'s JS API (not its CLI, to avoid shelling out); this is a
-  standalone npm package, not part of the `clients/` pnpm workspace. The `openapi-types` job
-  in `.github/workflows/ci.yml` runs the generator and fails the build on any diff against
-  the committed `api-types.ts`. If a PR changes a `Comp.Contracts` DTO or an endpoint's
-  shape, run `npm run generate` in `tools/generate-api-types` and commit the result.
+  every build). `tools/generate-api-types` turns that into
+  `clients/packages/api-types/src/index.ts` via `openapi-typescript`'s JS API (not its CLI,
+  to avoid shelling out); the generator itself is a standalone npm package, not part of the
+  `clients/` pnpm workspace, but its output **is** a workspace package (`@comp/api-types`)
+  that both `web` and `mobile` depend on. (Originally generated straight into
+  `clients/mobile/api/`, back when the admin app was still going to be Blazor WASM sharing
+  `Comp.Contracts` directly — moved to a shared package once `web` also needed it in
+  TypeScript, before mobile existed to have a path baked in against it.) The
+  `openapi-types` job in `.github/workflows/ci.yml` runs the generator and fails the build
+  on any diff against the committed `index.ts`. If a PR changes a `Comp.Contracts` DTO or
+  an endpoint's shape, run `npm run generate` in `tools/generate-api-types` and commit the
+  result.
 
-**Milestone M3 (register, competitions, leagues) is in progress.** Delivered so far:
+**Milestone M3 (register, competitions, leagues) is complete.** Delivered:
 
 - **Shooter endpoints.** `GET /shooters` (search — `q`, `active`, `recentFirst`; any
   authenticated role), `GET /shooters/{id}/history` (audit trail; any authenticated role),
@@ -188,18 +194,55 @@ Milestone M2 is complete. Delivered:
     already-projected record isn't translatable and threw at runtime (missed by the
     build, only caught by the test actually calling the endpoint). Order on the raw
     joined columns, then `.Select()` into the DTO — see `LoadMembersAsync`.
+- **Web admin shell.** `clients/web` — Vite + React 19 + TypeScript, React Router,
+  TanStack Query, Tailwind v4 (`@tailwindcss/vite`, no `tailwind.config.js` needed), and
+  shadcn-style components (`cn` + `class-variance-authority`, not the shadcn CLI itself —
+  see below). A login screen (`routes/LoginPage.tsx`) calls `/auth/login` and stores
+  tokens in `localStorage`; `lib/api.ts` is an `openapi-fetch` client typed against
+  `@comp/api-types` that attaches the bearer token to every request and does a
+  single-shot refresh-and-retry on a 401 for GET requests (a body-bearing request that
+  hits the 15-minute token boundary surfaces its 401 as-is — retrying an already-sent
+  body safely needs more care than this first pass took on). `routes/ShootersPage.tsx`
+  proves the whole chain end-to-end: search box → TanStack Query → typed fetch → TanStack
+  Table. Verified: `pnpm --filter web build`, `typecheck`, and `test` all pass; the dev
+  server serves on :5173; the API's CORS preflight actually allows that origin (checked
+  live, not just via the CORS config existing).
+  - `@tanstack/react-table` is pinned to `^8.9.9`, not the newly-published `9.x` — v9
+    replaced the familiar `useReactTable`/`getCoreRowModel`/`createColumnHelper` API with
+    a new reactive-store-based one (`useTable`, `createTableHook`), and even v9's own
+    `/legacy` compatibility layer marks every v8-style export deprecated. Don't float to
+    `^9` without deliberately learning and adopting the new API — the deprecated shim
+    isn't worth building fresh code on.
+  - **shadcn/ui scope note:** this uses shadcn's *component pattern* (the CSS variable
+    theme layer in `index.css`, `cn`, `cva`-based variants) rather than the actual shadcn
+    CLI, which is inherently interactive (prompts for style/base color/etc.) and wasn't
+    run here. Running `npx shadcn init`/`add` for real, or hand-building more primitives
+    matching this same convention, are both reasonable next steps — just don't assume
+    `components.json` or a shadcn-managed component tree exists yet.
+  - Moved `clients/mobile/api/api-types.ts` to the new `@comp/api-types` workspace
+    package (see the OpenAPI bullet above) so `web` could depend on it without reaching
+    into a sibling app's folder.
+  - **Found and partially fixed a pre-existing gap while verifying `pnpm -r test`:**
+    `clients/packages/core/src/time.ts` and its test file have been empty stubs since M0,
+    despite rule 4 ("parsing and formatting lives in `clients/packages/core/src/time.ts`
+    and nowhere else") and the testing expectations section both treating this package as
+    needing near-total, property-based-tested coverage. The empty test file was actively
+    failing `pnpm -r test` (an empty test file errors; zero test files don't, given
+    `--passWithNoTests`) — removed the empty file and added `--passWithNoTests` to
+    `core`'s test script so CI is honestly green rather than silently broken, but **the
+    actual `m:ss.cc` ⇄ milliseconds implementation and its property-based tests are still
+    unwritten.** This should be picked up as its own task before anything (the entry
+    screen prototype, results display) needs real time formatting.
 
-Not yet built for M3: the web admin shell (`clients/web` doesn't exist yet — the schema,
-service and endpoint work is otherwise done). Promotion/relegation isn't in M3's scope per
-the roadmap (the acceptance criterion only requires shooters assigned across leagues, not
-promoted between competitions) — treat it as a later addition unless asked for explicitly.
-There's also no "activate" transition for a competition (Planning → Active) — the API
-design doesn't call for one, so competitions stay in `Planning` until something needs
-`Active` specifically.
+Not yet built for M3: nothing — promotion/relegation isn't in M3's scope per the roadmap
+(the acceptance criterion only requires shooters assigned across leagues, not promoted
+between competitions) and stays deferred unless asked for explicitly. There's also no
+"activate" transition for a competition (Planning → Active) — the API design doesn't call
+for one, so competitions stay in `Planning` until something needs `Active` specifically.
 
-Not yet built past M3: events/squads, the scoring engine, result entry, standings.
+Not yet built past M3: `clients/packages/core`'s actual time parsing/formatting (see
+above), events/squads, the scoring engine, result entry, standings.
 
-Do not build admin screens without checking in first — `clients/web` doesn't exist yet and
-is a substantial scaffold, not a quick addition. Do not build a competition-data write
-endpoint before deciding how it authenticates — the audit interceptor throws if
-`SaveChangesAsync` runs with no current user (and no `PendingActorOverride`), by design.
+Do not build a competition-data write endpoint before deciding how it authenticates — the
+audit interceptor throws if `SaveChangesAsync` runs with no current user (and no
+`PendingActorOverride`), by design.

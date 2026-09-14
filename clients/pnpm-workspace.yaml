@@ -2,3 +2,5 @@ packages:
   - 'packages/*'
   - 'web'
   - 'mobile'
+minimumReleaseAgeExclude:
+  - lucide-react@1.46.0

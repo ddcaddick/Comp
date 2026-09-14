@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Builds Comp.Api (which writes its OpenAPI document to /openapi/Comp.Api.json as a build
 // step — see OpenApiDocumentsDirectory in Comp.Api.csproj) and turns that document into
-// clients/mobile/api/api-types.ts. CI runs this and then diffs the result against what's
-// committed; a difference means the API changed shape without the client types being
-// regenerated, and the build fails rather than shipping a silent mismatch.
+// clients/packages/api-types/src/index.ts, a workspace package both the web and mobile
+// clients depend on. CI runs this and then diffs the result against what's committed; a
+// difference means the API changed shape without the client types being regenerated, and
+// the build fails rather than shipping a silent mismatch.
 import { execSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -14,7 +15,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..", "..");
 const apiProjectPath = path.join(repoRoot, "src", "Comp.Api");
 const openApiJsonPath = path.join(repoRoot, "openapi", "Comp.Api.json");
-const outputPath = path.join(repoRoot, "clients", "mobile", "api", "api-types.ts");
+const outputPath = path.join(repoRoot, "clients", "packages", "api-types", "src", "index.ts");
 
 console.log("Building Comp.Api to regenerate its OpenAPI document...");
 execSync(`dotnet build "${apiProjectPath}" --configuration Release`, {
