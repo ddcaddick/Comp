@@ -30,6 +30,14 @@ public class CompDbContext(DbContextOptions<CompDbContext> options)
     /// </summary>
     public string? PendingAuditReason { get; set; }
 
+    /// <summary>
+    /// Overrides the actor <see cref="AuditSaveChangesInterceptor"/> attributes the next
+    /// save to, for the rare flow where there is no authenticated <c>ClaimsPrincipal</c> yet
+    /// but the actor is still known — e.g. a user's own login attempt updating their
+    /// lockout counters. Cleared once read, same as <see cref="PendingAuditReason"/>.
+    /// </summary>
+    public Guid? PendingActorOverride { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

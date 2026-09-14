@@ -1,10 +1,16 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Comp.Api.Security;
+using Comp.Api.Validation;
 using Comp.Application.Abstractions;
+using Comp.Application.Validation;
+using Comp.Contracts.Auth;
 using Comp.Infrastructure;
 using Comp.Infrastructure.Identity;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -37,9 +43,13 @@ builder.Services
     .AddClaimsPrincipalFactory<AppUserClaimsPrincipalFactory>()
     .AddDefaultTokenProviders();
 
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+builder.Services.AddScoped<JwtAccessTokenGenerator>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
+
 // Access tokens are short-lived (15 minutes); the mobile app stays signed in via a
-// rotating refresh token instead. No endpoint issues a token yet — this only wires the
-// validation side of the pipeline so authorisation policies below have something to run.
+// rotating refresh token instead.
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -62,9 +72,26 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("CanAmendPublished", policy =>
         policy.RequireClaim(AppUserClaimsPrincipalFactory.AmendPublishedClaimType, "true")));
 
+// Partitioned by client IP so one caller hammering /auth/login can't lock everyone else
+// out of it too.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+});
+
 var app = builder.Build();
 
 app.UseCors();
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -75,4 +102,31 @@ app.MapGet("/health", () => Results.Ok(new
     at = DateTimeOffset.UtcNow
 }));
 
+var auth = app.MapGroup("/auth");
+
+auth.MapPost("/login", async (LoginRequest request, IAuthService authService, CancellationToken ct) =>
+        (await authService.LoginAsync(request, ct)) switch
+        {
+            AuthResult.Success success => Results.Ok(success.Tokens),
+            AuthResult.Failure failure => Results.Problem(detail: failure.Reason, statusCode: StatusCodes.Status401Unauthorized),
+            _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
+        })
+    .AddEndpointFilter<ValidationFilter<LoginRequest>>()
+    .RequireRateLimiting("auth")
+    .AllowAnonymous();
+
+auth.MapPost("/refresh", async (RefreshRequest request, IAuthService authService, CancellationToken ct) =>
+        (await authService.RefreshAsync(request, ct)) switch
+        {
+            AuthResult.Success success => Results.Ok(success.Tokens),
+            AuthResult.Failure failure => Results.Problem(detail: failure.Reason, statusCode: StatusCodes.Status401Unauthorized),
+            _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
+        })
+    .AddEndpointFilter<ValidationFilter<RefreshRequest>>()
+    .RequireRateLimiting("auth")
+    .AllowAnonymous();
+
 app.Run();
+
+// Exposed so WebApplicationFactory<Program> can host this app from integration tests.
+public partial class Program;
