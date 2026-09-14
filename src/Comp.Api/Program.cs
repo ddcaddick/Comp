@@ -72,6 +72,11 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("CanAmendPublished", policy =>
         policy.RequireClaim(AppUserClaimsPrincipalFactory.AmendPublishedClaimType, "true")));
 
+// The document this produces is also written to disk at build time (see the
+// OpenApiDocumentsDirectory property in Comp.Api.csproj) — that copy is what
+// tools/generate-api-types reads to produce clients/mobile/api/api-types.ts.
+builder.Services.AddOpenApi();
+
 // Partitioned by client IP so one caller hammering /auth/login can't lock everyone else
 // out of it too.
 builder.Services.AddRateLimiter(options =>
@@ -96,6 +101,8 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapOpenApi();
+
 app.MapGet("/health", () => Results.Ok(new
 {
     status = "ok",
@@ -113,7 +120,10 @@ auth.MapPost("/login", async (LoginRequest request, IAuthService authService, Ca
         })
     .AddEndpointFilter<ValidationFilter<LoginRequest>>()
     .RequireRateLimiting("auth")
-    .AllowAnonymous();
+    .AllowAnonymous()
+    .Produces<TokenResponse>()
+    .ProducesValidationProblem()
+    .ProducesProblem(StatusCodes.Status401Unauthorized);
 
 auth.MapPost("/refresh", async (RefreshRequest request, IAuthService authService, CancellationToken ct) =>
         (await authService.RefreshAsync(request, ct)) switch
@@ -124,7 +134,10 @@ auth.MapPost("/refresh", async (RefreshRequest request, IAuthService authService
         })
     .AddEndpointFilter<ValidationFilter<RefreshRequest>>()
     .RequireRateLimiting("auth")
-    .AllowAnonymous();
+    .AllowAnonymous()
+    .Produces<TokenResponse>()
+    .ProducesValidationProblem()
+    .ProducesProblem(StatusCodes.Status401Unauthorized);
 
 app.Run();
 

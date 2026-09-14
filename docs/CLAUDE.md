@@ -79,6 +79,14 @@ dotnet ef migrations add <Name> --project src/Comp.Infrastructure --startup-proj
 dotnet ef database update --project src/Comp.Infrastructure --startup-project src/Comp.Api
 ```
 
+Regenerate the mobile client's API types after changing a `Comp.Contracts` DTO or an
+endpoint's shape (CI fails the build if this drifts from what's committed):
+
+```powershell
+cd tools/generate-api-types
+npm run generate
+```
+
 ## Testing expectations
 
 `Comp.Scoring` and `clients/packages/core` need near-total coverage, including property-based
@@ -89,7 +97,7 @@ this project has available to it. Write the test.
 
 ## Current position
 
-Milestone M2 is in progress. Done so far:
+Milestone M2 is complete. Delivered:
 
 - **Domain and schema.** All entities from the architecture doc's section D exist in
   `Comp.Domain`, mapped by `Comp.Infrastructure/CompDbContext.cs` and the per-entity
@@ -124,14 +132,18 @@ Milestone M2 is in progress. Done so far:
     `CompDbContext.PendingActorOverride` to that user's id before saving, so the audit
     interceptor's no-current-user guard doesn't fire. Follow this pattern for any future
     anonymous-but-self-attributable write; the guard itself is not to be relaxed.
+- **OpenAPI type generation in CI.** `Comp.Api` writes its OpenAPI document to
+  `/openapi/Comp.Api.json` as a build step (`Microsoft.Extensions.ApiDescription.Server`,
+  configured via `OpenApiDocumentsDirectory` in `Comp.Api.csproj` — gitignored, regenerated
+  every build). `tools/generate-api-types` turns that into `clients/mobile/api/api-types.ts`
+  via `openapi-typescript`'s JS API (not its CLI, to avoid shelling out); this is a
+  standalone npm package, not part of the `clients/` pnpm workspace. The `openapi-types` job
+  in `.github/workflows/ci.yml` runs the generator and fails the build on any diff against
+  the committed `api-types.ts`. If a PR changes a `Comp.Contracts` DTO or an endpoint's
+  shape, run `npm run generate` in `tools/generate-api-types` and commit the result.
 
-Not yet built:
-
-- **OpenAPI type generation in CI** (section G/M of the architecture doc) — generates
-  `clients/mobile/api/api-types.ts` from `Comp.Contracts` and fails the build on drift. The
-  last item needed to fully close out M2.
-- Everything past M2: shooter CRUD, competitions/leagues, events/squads, the scoring engine,
-  result entry, standings.
+Not yet built: everything past M2 — shooter CRUD, competitions/leagues, events/squads, the
+scoring engine, result entry, standings.
 
 Do not build admin screens yet, and do not build a competition-data write endpoint before
 deciding how it authenticates — the audit interceptor throws if `SaveChangesAsync` runs with

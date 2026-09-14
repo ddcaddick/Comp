@@ -33,3 +33,24 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r typecheck
       - run: pnpm -r test
+
+  openapi-types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/generate-api-types/package-lock.json
+      - run: npm ci
+        working-directory: tools/generate-api-types
+      - run: npm run generate
+        working-directory: tools/generate-api-types
+      # A renamed field or a changed nullable becomes a compile error in the mobile app
+      # rather than a runtime surprise at the range — fail here, before it ships, if
+      # api-types.ts doesn't match what regenerating it just produced.
+      - run: git diff --exit-code -- clients/mobile/api/api-types.ts

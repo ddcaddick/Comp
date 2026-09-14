@@ -487,6 +487,10 @@ dist/
 .expo/
 *.tsbuildinfo
 
+# OpenAPI document, regenerated on every build (see OpenApiDocumentsDirectory in
+# Comp.Api.csproj); only the TypeScript types derived from it are committed.
+/openapi/
+
 # local env
 .env
 .env.local

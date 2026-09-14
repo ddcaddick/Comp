@@ -1,0 +1,13 @@
+{
+  "name": "generate-api-types",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Generates clients/mobile/api/api-types.ts from Comp.Api's OpenAPI document.",
+  "scripts": {
+    "generate": "node generate.mjs"
+  },
+  "dependencies": {
+    "openapi-typescript": "^7.4.1"
+  }
+}
