@@ -74,9 +74,13 @@ public class AuditSaveChangesInterceptor(ICurrentUserAccessor currentUser) : Sav
             return;
         }
 
-        var actorUserId = currentUser.UserId
+        // The override (set by a flow with no ClaimsPrincipal yet, e.g. a login attempt
+        // updating the user's own lockout counters) wins when present; otherwise the actor
+        // must come from the authenticated request.
+        var actorUserId = context.PendingActorOverride ?? currentUser.UserId
             ?? throw new InvalidOperationException(
                 "Cannot save a change to audited data without a current user to attribute it to.");
+        context.PendingActorOverride = null;
 
         // Read once and clear immediately: a reason attaches only to the save it was set for.
         var reason = context.PendingAuditReason;

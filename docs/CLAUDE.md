@@ -108,18 +108,31 @@ Milestone M2 is in progress. Done so far:
   (`SUPER_ADMIN`, `ADMIN`, `OFFICIAL`, `READ_ONLY`) seeded by the migration itself, and
   `refresh_tokens`. `AppUserClaimsPrincipalFactory` turns `CanAmendPublished` into an
   `amend_published` claim at sign-in, and a `CanAmendPublished` authorisation policy is
-  registered in `Program.cs`. JWT bearer authentication is wired on the validation side only
-  — no endpoint issues a token yet. Tested in `tests/Comp.Api.Tests/IdentityTests.cs`.
+  registered in `Program.cs`. Tested in `tests/Comp.Api.Tests/IdentityTests.cs`.
+- **Auth endpoints.** `POST /auth/login` and `POST /auth/refresh` are live. `AuthService`
+  (`Comp.Infrastructure/Identity/AuthService.cs`) checks credentials via `UserManager`,
+  enforces Identity's lockout after repeated failures, issues a 15-minute JWT access token
+  (`JwtAccessTokenGenerator`) plus a 90-day opaque refresh token stored only as a SHA-256
+  hash (`RefreshTokenGenerator`). Refresh rotates the token and revokes the old one; presenting
+  an already-rotated token revokes the whole chain for that user (theft signal). Both
+  endpoints run FluentValidation via `ValidationFilter<T>` and are rate-limited per client IP
+  (5/minute). Login never distinguishes "no such account" from "wrong password" in what it
+  returns. Tested end-to-end via `WebApplicationFactory` + Testcontainers in
+  `tests/Comp.Api.Tests/AuthEndpointTests.cs`.
+  - Note: a flow with no `ClaimsPrincipal` yet that still needs to write to an audited
+    entity (e.g. login updating the account's own lockout counters) sets
+    `CompDbContext.PendingActorOverride` to that user's id before saving, so the audit
+    interceptor's no-current-user guard doesn't fire. Follow this pattern for any future
+    anonymous-but-self-attributable write; the guard itself is not to be relaxed.
 
 Not yet built:
 
-- **Auth endpoints.** `/auth/login` and `/auth/refresh` — token issuance, refresh-token
-  rotation and hashing, rate limiting on login. Needed before any client can authenticate.
 - **OpenAPI type generation in CI** (section G/M of the architecture doc) — generates
-  `clients/mobile/api/api-types.ts` from `Comp.Contracts` and fails the build on drift.
+  `clients/mobile/api/api-types.ts` from `Comp.Contracts` and fails the build on drift. The
+  last item needed to fully close out M2.
 - Everything past M2: shooter CRUD, competitions/leagues, events/squads, the scoring engine,
   result entry, standings.
 
 Do not build admin screens yet, and do not build a competition-data write endpoint before
 deciding how it authenticates — the audit interceptor throws if `SaveChangesAsync` runs with
-no current user, by design.
+no current user (and no `PendingActorOverride`), by design.
