@@ -10,7 +10,12 @@ public class HttpContextCurrentUserAccessor(IHttpContextAccessor httpContextAcce
     {
         get
         {
-            var idClaim = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var user = httpContextAccessor.HttpContext?.User;
+            // JwtAccessTokenGenerator issues a plain "sub" claim. Program.cs sets
+            // MapInboundClaims = false so it arrives under that exact name rather than
+            // being silently remapped to ClaimTypes.NameIdentifier depending on handler
+            // defaults; NameIdentifier is checked too for any other auth scheme.
+            var idClaim = user?.FindFirstValue("sub") ?? user?.FindFirstValue(ClaimTypes.NameIdentifier);
             return Guid.TryParse(idClaim, out var id) ? id : null;
         }
     }
