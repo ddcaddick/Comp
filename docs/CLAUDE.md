@@ -835,6 +835,50 @@ tagline, grouped as one visual unit directly under the wordmark) is now replicat
 gain the tagline — mobile itself only shows it on sign-in, never on every screen's header, so
 matching that scope kept the persistent nav mark unchanged.
 
+**Squad allocation is now a real workflow, not just squad-runner status text.** Requested after
+using the mobile app for real sign-on: officials could see squads and drag shooters into them,
+but couldn't tell how full a squad was, couldn't lock one once it was settled, and had no record
+of when a shooter actually turned up (arrival order is meant to drive allocation, since shooters
+sign on as they arrive, not in a pre-planned order).
+
+- **`SquadStatus` was redefined** from an aspirational, never-wired-up "progress through the
+  night's runs" enum (`Pending, Run1, Run2, Complete` — confirmed unused anywhere but the enum
+  declaration itself before this change) to what's actually needed: `Pending`/`Allocated`,
+  meaning "still open for shooters to be assigned into" vs. "roster locked." No migration
+  needed — `SquadConfiguration` stores it as free text with no check constraint. `POST
+  /events/{id}/squads/{squadId}/complete` (Super Admin/Admin/Official, same as squad
+  creation) sets it, is idempotent (completing an already-allocated squad just returns it
+  unchanged), and is refused on a `Finalised` event like every other squad/participant write.
+- **An `Allocated` squad is closed to further additions**, enforced in
+  `EventParticipantService` itself (not just hidden client-side): both adding a brand-new
+  participant straight into that squad and moving an already-unassigned one into it later
+  return 409 — but adjusting the position of someone already in the squad before it was locked
+  still works, since that's not "moving in."
+- **`EventParticipant.AddedAt` already existed** (set at creation, never previously exposed)
+  — added to `EventParticipantResponse` rather than needing a new column. The mobile squad
+  list now shows it next to each unassigned shooter's name and sorts that list by it
+  ascending, so the top of the list is whoever's been waiting longest — matching how
+  allocation is meant to actually work on the night (first come, first squadded).
+- Mobile squad rows now show a live shooter count (`"N shooters · Pending/Allocated"`), turn
+  green when Allocated (reusing the `success`/`successBg`/`successBorder` tokens that already
+  existed in the palette but had no consumer yet), and the unassigned shooters' squad-chip
+  list only offers squads that are still `Pending`. The "Complete" action button is
+  deliberately **yellow** (`colors.warning`, a token added for this), not green — sharing the
+  Allocated state's green read as "this is already done" at a glance, which is the opposite of
+  what an action button should signal.
+- **The add-shooter screen no longer boots you out after one add.** It used to navigate back
+  immediately on a successful add, so adding several shooters meant reopening the search
+  screen from scratch each time, and there was no way to tell who was already in the event
+  from the search results. Now every result stays visible with either "Add+" or "Added" (the
+  event's own participant list, fetched here too and shared via the same `["participants",
+  eventId]` query key the squad list uses, so both screens invalidate together), and tapping
+  "Add+" flips that one row to "Added" in place without leaving the screen.
+- **Fixed the back button showing the literal word "tabs".** Screens pushed from inside the
+  `(tabs)` group (e.g. tapping a Home event straight into its squad list) inherited a back
+  button label derived from the tab group's own route name, since nothing had ever set
+  `headerBackButtonDisplayMode`. Set to `"minimal"` (plus an empty `headerBackTitle`) globally
+  in the root `_layout.tsx`, so every back button everywhere is just the arrow.
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 

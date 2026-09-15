@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "@/lib/api";
 import { colors, fonts } from "@/lib/theme";
 
+function errorDetail(error: unknown, fallback: string): string {
+  const detail = (error as { detail?: string | null } | undefined)?.detail;
+  return detail ?? fallback;
+}
+
 export default function AddParticipantScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
-  const router = useRouter();
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
@@ -25,9 +29,17 @@ export default function AddParticipantScreen() {
     },
   });
 
-  function addParticipant(shooterId: string) {
-    addMutation.mutate(shooterId);
-  }
+  // Shared with the squad list screen's own ["participants", eventId] query, so adding
+  // someone here is immediately reflected there too without a second round trip.
+  const participantsQuery = useQuery({
+    queryKey: ["participants", eventId],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/events/{id}/participants", { params: { path: { id: eventId } } });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const addedShooterIds = new Set((participantsQuery.data ?? []).map((p) => p.shooterId));
 
   const addMutation = useMutation({
     mutationFn: async (shooterId: string) => {
@@ -35,14 +47,11 @@ export default function AddParticipantScreen() {
         params: { path: { id: eventId } },
         body: { shooterId, squadId: null },
       });
-      if (error) {
-        const detail = (error as { detail?: string | null } | undefined)?.detail;
-        throw new Error(detail ?? "Could not add this shooter to the event.");
-      }
+      if (error) throw new Error(errorDetail(error, "Could not add this shooter to the event."));
     },
     onSuccess: () => {
+      setError(null);
       queryClient.invalidateQueries({ queryKey: ["participants", eventId] });
-      router.back();
     },
     onError: (err: Error) => setError(err.message),
   });
@@ -53,21 +62,22 @@ export default function AddParticipantScreen() {
         body: { firstName, lastName, nickname: null, membershipNo: null },
       });
       if (error || !data) {
-        const detail = (error as { detail?: string | null } | undefined)?.detail;
-        throw new Error(detail ?? "Could not create this shooter.");
+        throw new Error(errorDetail(error, "Could not create this shooter."));
       }
       const addResult = await api.POST("/events/{id}/participants", {
         params: { path: { id: eventId } },
         body: { shooterId: data.id, squadId: null },
       });
       if (addResult.error) {
-        const detail = (addResult.error as { detail?: string | null } | undefined)?.detail;
-        throw new Error(detail ?? "Shooter created, but could not add them to the event.");
+        throw new Error(errorDetail(addResult.error, "Shooter created, but could not add them to the event."));
       }
     },
     onSuccess: () => {
+      setError(null);
+      setFirstName("");
+      setLastName("");
+      setShowCreate(false);
       queryClient.invalidateQueries({ queryKey: ["participants", eventId] });
-      router.back();
     },
     onError: (err: Error) => setError(err.message),
   });
@@ -89,19 +99,27 @@ export default function AddParticipantScreen() {
       {shootersQuery.isLoading && <ActivityIndicator color={colors.accent} style={styles.spinner} />}
 
       <ScrollView contentContainerStyle={styles.list}>
-        {(shootersQuery.data ?? []).map((shooter) => (
-          <Pressable
-            key={shooter.id}
-            style={styles.row}
-            disabled={addMutation.isPending}
-            onPress={() => addParticipant(shooter.id)}
-          >
-            <Text style={styles.rowName}>
-              {shooter.firstName} {shooter.lastName}
-            </Text>
-            <Text style={styles.rowAction}>Add</Text>
-          </Pressable>
-        ))}
+        {(shootersQuery.data ?? []).map((shooter) => {
+          const isAdded = addedShooterIds.has(shooter.id);
+          return (
+            <View key={shooter.id} style={styles.row}>
+              <Text style={styles.rowName}>
+                {shooter.firstName} {shooter.lastName}
+              </Text>
+              {isAdded ? (
+                <Text style={styles.rowAdded}>Added</Text>
+              ) : (
+                <Pressable
+                  style={styles.addButton}
+                  disabled={addMutation.isPending}
+                  onPress={() => addMutation.mutate(shooter.id)}
+                >
+                  <Text style={styles.rowAction}>Add+</Text>
+                </Pressable>
+              )}
+            </View>
+          );
+        })}
         {!shootersQuery.isLoading && (shootersQuery.data ?? []).length === 0 && (
           <Text style={styles.empty}>No matching shooters.</Text>
         )}
@@ -171,7 +189,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   rowName: { fontFamily: fonts.semibold, fontSize: 15, color: colors.textPrimary },
+  addButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.accent },
   rowAction: { fontFamily: fonts.bold, fontSize: 13, color: colors.accent },
+  rowAdded: { fontFamily: fonts.monoMedium, fontSize: 12, color: colors.textMuted },
   empty: { textAlign: "center", fontFamily: fonts.body, color: colors.textSecondary, marginTop: 20 },
   createToggle: { marginTop: 12, alignItems: "center" },
   createToggleText: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent },

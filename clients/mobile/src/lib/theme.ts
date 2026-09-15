@@ -32,6 +32,8 @@ export const colors = {
   successBg: "rgba(61,220,151,0.06)",
   successBorder: "rgba(61,220,151,0.3)",
 
+  warning: "#f5c94a",
+
   inputBg: "#0f1116",
   inputBgFocus: "#12151a",
   chipBg: "rgba(255,255,255,0.09)",
