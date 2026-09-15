@@ -1027,6 +1027,17 @@ emulator's Chrome (a real phone-width viewport, not a resized desktop window): l
 `adb input`, confirmed the header shows nothing clipped, and the opened menu shows all three nav
 links, "Dev Admin", and "Sign out" fully visible.
 
+**Fixed a real sign-in bug found on the user's own sideloaded APK**: the same staging admin
+credentials worked on the web app but were consistently rejected as "Invalid email or password"
+from the built APK, with no autofill involved and the text visually verified correct via the
+sign-in screen's own SHOW toggle. The sign-in screen (`app/index.tsx`) already trimmed the email
+before calling `login()` but sent the password as-is. A browser's `<input>` strips a trailing
+newline/space picked up from a paste; React Native's `TextInput` on Android often does not — a
+password copied from somewhere that included one invisible trailing character would look
+identical on screen but silently fail to authenticate from the APK while the same paste worked
+fine on web. Fixed by trimming the password too, both in the empty-field guard and at the actual
+`login()` call.
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 
