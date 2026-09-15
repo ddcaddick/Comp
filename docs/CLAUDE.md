@@ -654,8 +654,63 @@ nothing ever exposing them. Two new pages, both under a competition (sibling to
   "Division A" (tier 1, defaults applied), added Ada Lovelace to it, watched the count go
   to 1/20 and the search immediately reflect "Already in league".
 
-Not yet built past M7: results/finalisation/standings persistence and endpoints (M8),
-output/hardening (M9), the actual EAS Android build and store submission (M10, per D11).
+**Milestone M8 (results, finalisation, standings) backend is complete.** `POST
+/events/{id}/transition` now accepts `Finalised` (only from `Review`), `POST
+/events/{id}/amend`, and `GET /events/{id}/results?leagueId=` are all live
+(`Comp.Api/Endpoints/EventEndpoints.cs`), plus `GET /leagues/{id}/standings`
+(`Comp.Api/Endpoints/LeagueEndpoints.cs`). This is the first thing in the whole codebase to
+actually call `Comp.Scoring` from a running service.
+
+- **`IResultsService`/`ResultsService`** (`Comp.Infrastructure/Events/ResultsService.cs`) is
+  the new service. Every query loads flat lists and joins in C# memory rather than writing a
+  deep LINQ-to-SQL join — a deliberate choice, not an oversight, after M3's
+  `LoadMembersAsync` bug (see above) already showed EF Core's translator can silently refuse
+  to run a query shaped that way.
+  - `GetEventResultsAsync` returns results computed **live** via `EventScorer.Score` for any
+    event not yet `Finalised` (`IsFinal: false` in the response), or the **frozen**
+    `event_results` rows for one that is (`IsFinal: true`) — never recomputes a finalised
+    event's numbers on read. Filters/orders by `leagueId` (on `LeaguePosition`) when given,
+    else by `OverallPosition`, DNF/unranked sorted last.
+  - `RecalculateAndPersistAsync` builds a `ScoringContext` from the event's participants,
+    runs, and each involved league's rules, calls `EventScorer.Score`, deletes any existing
+    `EventResult` rows for the event and inserts fresh ones — this is what "finalise"
+    actually does to the database, and it's also exactly what re-finalising after an amend
+    repeats.
+  - `GetLeagueStandingsAsync` finds every `Finalised` **and** `CountsForStandings` event in
+    the league's competition ordered by `EventNumber` (this ordering *is* "events held" and
+    the chronological sequence `StandingsCalculator` needs), loads that league's
+    `EventResult` rows across them, groups into one `ShooterEventPoints` list per shooter
+    (via `EventParticipant.ShooterId` — a shooter has a different `EventParticipantId` each
+    event), and calls `StandingsCalculator.Calculate`. Confirms rule 9 directly: nothing
+    here is ever read back from a standings table, because there isn't one.
+- **Finalise is also publish — there is no separate status or endpoint for it.** The
+  architecture doc's `EventStatus` enum has no "Published" value; `TransitionAsync`'s
+  `Finalised` branch requires the current status to be exactly `Review` (else 409), then
+  calls `RecalculateAndPersistAsync` before flipping `Status`/`FinalisedAt`/
+  `FinalisedByUserId` in a second `SaveChangesAsync` (a separate audit entry from the result
+  rows' own inserts).
+- **Amend requires the `Finalised` status, the Super Admin/Admin role, *and* the
+  `CanAmendPublished` claim** — the endpoint's authorization policy combines
+  `.RequireRole(...)` and `.RequireClaim(AppUserClaimsPrincipalFactory.AmendPublishedClaimType,
+  "true")` on the same policy, the first time this codebase has combined the two. `AmendAsync`
+  deletes the event's `EventResult` rows, moves it back to `Review`, clears
+  `FinalisedAt`/`FinalisedByUserId`, and sets `CompDbContext.PendingAuditReason` from the
+  request body before saving so the audit log records *why* — this is `CanAmendPublished`
+  actually being used for the first time since it was wired up in M2.
+- Tested end-to-end in `tests/Comp.Api.Tests/ResultsEndpointTests.cs` (6 new tests, 84/84
+  passing overall): live-vs-frozen results before/after finalising; correct overall and
+  league points on finalise; the Review-only and role-gated finalise conflicts; the
+  role-and-claim-and-reason gate on amend (including the deliberate negative case of an Admin
+  *without* the claim); the milestone's actual acceptance criterion end-to-end (finalise,
+  amend with a reason, correct a run so the faster/slower shooters swap, re-finalise, and see
+  the standings positions actually flip); and the continuous drop-rule boundary
+  (`eventsHeld == dropWorstCount` still provisional, matching D7).
+
+Not yet built: the M8 **web UI** (results tables, a per-league standings page, a "Finalise"
+button on the Events page when a event is in Review, an "Amend" button with a reason prompt
+when Finalised — the backend's role+claim gate is enough on its own, per this codebase's
+established convention of not also hiding actions client-side based on assumed roles), M9
+(hardening), and the actual EAS Android build and store submission (M10, per D11).
 
 Do not build a competition-data write endpoint before deciding how it authenticates — the
 audit interceptor throws if `SaveChangesAsync` runs with no current user (and no

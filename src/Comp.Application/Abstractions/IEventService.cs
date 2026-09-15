@@ -24,10 +24,18 @@ public interface IEventService
 
     /// <summary>
     /// Moves to an adjacent status in the Draft → Setup → InProgress → Review chain, in
-    /// either direction. Finalising isn't available yet — that's M8, which needs the
-    /// scoring engine wired in to actually compute and freeze results; this returns a
-    /// <see cref="EventCommandResult.Conflict"/> for a "to" of Finalised in the meantime, and
-    /// always for a currently-finalised event (locked, full stop, until M8's amend flow).
+    /// either direction, or from Review to Finalised — which computes and freezes results
+    /// via <see cref="IResultsService.RecalculateAndPersistAsync"/> before locking. A
+    /// currently-finalised event refuses every transition; <see cref="AmendAsync"/> is the
+    /// only way out.
     /// </summary>
     Task<EventCommandResult> TransitionAsync(Guid id, TransitionEventRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Unlocks a finalised event back to Review with a mandatory reason (audited), clearing
+    /// its frozen results — they're stale the moment the event reopens for correction, and
+    /// a fresh finalisation recomputes them. Callers gate this on the amend-published
+    /// privilege; this method doesn't check it itself.
+    /// </summary>
+    Task<EventCommandResult> AmendAsync(Guid id, AmendEventRequest request, CancellationToken cancellationToken);
 }

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Comp.Infrastructure.Events;
 
-public class EventService(CompDbContext dbContext, ICurrentUserAccessor currentUser) : IEventService
+public class EventService(CompDbContext dbContext, ICurrentUserAccessor currentUser, IResultsService resultsService) : IEventService
 {
     // Finalising is excluded — see IEventService.TransitionAsync's remarks.
     private static readonly EventStatus[] PreFinaliseChain =
@@ -105,12 +105,26 @@ public class EventService(CompDbContext dbContext, ICurrentUserAccessor currentU
 
         if (@event.Status == EventStatus.Finalised)
         {
-            return new EventCommandResult.Conflict("Event is finalised and locked; amending it isn't available yet.");
+            return new EventCommandResult.Conflict("Event is finalised and locked; use the amend endpoint to unlock it.");
         }
 
         if (target == EventStatus.Finalised)
         {
-            return new EventCommandResult.Conflict("Finalising an event isn't available yet.");
+            if (@event.Status != EventStatus.Review)
+            {
+                return new EventCommandResult.Conflict("An event can only be finalised from Review.");
+            }
+
+            // Computes and freezes event_results before the status flips — RecalculateAndPersistAsync
+            // saves its own changes, so this is two SaveChanges calls (results, then the status
+            // itself), each its own audit entry.
+            await resultsService.RecalculateAndPersistAsync(id, cancellationToken);
+            @event.Status = EventStatus.Finalised;
+            @event.FinalisedAt = DateTimeOffset.UtcNow;
+            @event.FinalisedByUserId = RequireActorId();
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return new EventCommandResult.Success(ToResponse(@event));
         }
 
         var currentIndex = Array.IndexOf(PreFinaliseChain, @event.Status);
@@ -122,6 +136,33 @@ public class EventService(CompDbContext dbContext, ICurrentUserAccessor currentU
         }
 
         @event.Status = target;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new EventCommandResult.Success(ToResponse(@event));
+    }
+
+    public async Task<EventCommandResult> AmendAsync(Guid id, AmendEventRequest request, CancellationToken cancellationToken)
+    {
+        var @event = await dbContext.Events.FindAsync([id], cancellationToken);
+        if (@event is null)
+        {
+            return new EventCommandResult.NotFound();
+        }
+
+        if (@event.Status != EventStatus.Finalised)
+        {
+            return new EventCommandResult.Conflict("Only a finalised event can be amended.");
+        }
+
+        // The frozen results are stale the moment the event reopens — a fresh finalisation
+        // recomputes them from whatever the correction turns out to be.
+        var staleResults = await dbContext.EventResults.Where(r => r.EventId == id).ToListAsync(cancellationToken);
+        dbContext.EventResults.RemoveRange(staleResults);
+
+        @event.Status = EventStatus.Review;
+        @event.FinalisedAt = null;
+        @event.FinalisedByUserId = null;
+        dbContext.PendingAuditReason = request.Reason;
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return new EventCommandResult.Success(ToResponse(@event));
