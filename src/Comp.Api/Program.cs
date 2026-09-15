@@ -58,6 +58,7 @@ builder.Services.AddScoped<ISquadService, SquadService>();
 builder.Services.AddScoped<IRunnerService, RunnerService>();
 builder.Services.AddScoped<IRunService, RunService>();
 builder.Services.AddScoped<IEntrySessionService, EntrySessionService>();
+builder.Services.AddScoped<IResultsService, ResultsService>();
 builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 
 // Access tokens are short-lived (15 minutes); the mobile app stays signed in via a

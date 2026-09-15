@@ -11,6 +11,16 @@ public static class LeagueEndpoints
     {
         var leagues = app.MapGroup("/leagues").RequireAuthorization();
 
+        leagues.MapGet("/{id:guid}/standings", async (Guid id, IResultsService service, CancellationToken ct) =>
+                (await service.GetLeagueStandingsAsync(id, ct)) switch
+                {
+                    LeagueStandingsResult.Success success => Results.Ok(success.Standings),
+                    LeagueStandingsResult.NotFound => Results.NotFound(),
+                    _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
+                })
+            .Produces<LeagueStandingsResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         leagues.MapGet("/{id:guid}/members", async (Guid id, ILeagueService service, CancellationToken ct) =>
                 (await service.GetMembersAsync(id, ct)) switch
                 {

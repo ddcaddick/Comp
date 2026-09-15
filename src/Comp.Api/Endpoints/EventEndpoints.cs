@@ -66,6 +66,35 @@ public static class EventEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        // Unlocking a finalised event needs both the role (per the security model's
+        // "Finalise and publish"/"Amend a published result" rows — Super Admin/Admin only)
+        // and the per-user amend-published claim; only a super admin grants that claim.
+        events.MapPost("/{id:guid}/amend", async (Guid id, AmendEventRequest request, IEventService service, CancellationToken ct) =>
+                (await service.AmendAsync(id, request, ct)) switch
+                {
+                    EventCommandResult.Success success => Results.Ok(success.Event),
+                    EventCommandResult.NotFound => Results.NotFound(),
+                    EventCommandResult.Conflict conflict =>
+                        Results.Problem(detail: conflict.Reason, statusCode: StatusCodes.Status409Conflict),
+                    _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
+                })
+            .AddEndpointFilter<ValidationFilter<AmendEventRequest>>()
+            .RequireAuthorization(policy => policy
+                .RequireRole(Roles.SuperAdmin, Roles.Admin)
+                .RequireClaim(AppUserClaimsPrincipalFactory.AmendPublishedClaimType, "true"))
+            .Produces<EventResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        events.MapGet("/{id:guid}/results", async (Guid id, Guid? leagueId, IResultsService service, CancellationToken ct) =>
+            {
+                var results = await service.GetEventResultsAsync(id, leagueId, ct);
+                return results is null ? Results.NotFound() : Results.Ok(results);
+            })
+            .Produces<EventResultsResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         events.MapGet("/{id:guid}/participants", async (Guid id, IEventParticipantService service, CancellationToken ct) =>
             {
                 var participants = await service.ListAsync(id, ct);

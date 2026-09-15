@@ -646,6 +646,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/leagues/{id}/standings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LeagueStandingsResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/leagues/{id}/members": {
         parameters: {
             query?: never;
@@ -962,6 +1008,122 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{id}/amend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AmendEventRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EventResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{id}/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    leagueId?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EventResultsResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1492,6 +1654,9 @@ export interface components {
             /** Format: uuid */
             squadId: null | string;
         };
+        AmendEventRequest: {
+            reason: string;
+        };
         CompetitionResponse: {
             /** Format: uuid */
             id: string;
@@ -1571,6 +1736,28 @@ export interface components {
             /** Format: int32 */
             positionInSquad: null | number | string;
         };
+        EventParticipantResultResponse: {
+            /** Format: uuid */
+            participantId: string;
+            /** Format: uuid */
+            shooterId: string;
+            firstName: string;
+            lastName: string;
+            /** Format: uuid */
+            leagueId: null | string;
+            leagueName: null | string;
+            status: string;
+            /** Format: int32 */
+            eventTimeMs: null | number | string;
+            /** Format: int32 */
+            bestRunNumber: null | number | string;
+            /** Format: int32 */
+            overallPosition: null | number | string;
+            /** Format: int32 */
+            leaguePosition: null | number | string;
+            /** Format: int32 */
+            leaguePoints: number | string;
+        };
         EventResponse: {
             /** Format: uuid */
             id: string;
@@ -1589,6 +1776,13 @@ export interface components {
             countsForStandings: boolean;
             /** Format: int32 */
             scoringRulesVersion: number | string;
+        };
+        EventResultsResponse: {
+            /** Format: uuid */
+            eventId: string;
+            eventStatus: string;
+            isFinal: boolean;
+            participants: components["schemas"]["EventParticipantResultResponse"][];
         };
         HttpValidationProblemDetails: {
             type?: null | string;
@@ -1624,6 +1818,29 @@ export interface components {
             /** Format: int32 */
             dropWorstCount: number | string;
             absencesCountAsZero: boolean;
+        };
+        LeagueStandingResponse: {
+            /** Format: uuid */
+            shooterId: string;
+            firstName: string;
+            lastName: string;
+            /** Format: int32 */
+            position: number | string;
+            /** Format: int32 */
+            runningTotal: number | string;
+            /** Format: int32 */
+            countingTotal: number | string;
+            /** Format: int32 */
+            droppedTotal: number | string;
+            isProvisional: boolean;
+        };
+        LeagueStandingsResponse: {
+            /** Format: uuid */
+            leagueId: string;
+            leagueName: string;
+            /** Format: int32 */
+            eventsHeld: number | string;
+            standings: components["schemas"]["LeagueStandingResponse"][];
         };
         LoginRequest: {
             email: string;
