@@ -242,7 +242,7 @@ importers:
         specifier: ~19.2.2
         version: 19.2.18
       eas-cli:
-        specifier: ^16.0.0
+        specifier: 16.32.0
         version: 16.32.0(@types/node@26.5.1)(supports-color@8.1.1)(typescript@6.0.3)
       fast-check:
         specifier: ^4.10.0
