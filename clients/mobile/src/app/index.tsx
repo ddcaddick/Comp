@@ -23,7 +23,7 @@ export default function SignInScreen() {
   }
 
   if (isAuthenticated) {
-    return <Redirect href="/events" />;
+    return <Redirect href="/home" />;
   }
 
   async function handleSubmit() {
