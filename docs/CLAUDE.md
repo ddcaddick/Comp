@@ -333,14 +333,66 @@ allows Official; all GETs are open to any authenticated role.
   source of truth) and the runs `PUT` endpoint — those are M7 (live result entry), which
   this milestone's schema and services are already shaped to support.
 
-Not yet built past M6: live result entry (M7), results/finalisation/standings persistence
-and endpoints (M8), output/hardening (M9).
-
 **Plan change (15 Sep 2026):** the architecture doc bumped to Version 4 — mobile deployment
 re-phased to an Android-only, sideloadable-APK prototyping stage (decision D11), with store
 submission on both platforms deferred to M10 rather than run in parallel from week 6. Nothing
 about M1–M6's work changes; this only affects M4 and M9/M10's store-related steps. See the
 doc's changelog and D11 for the full reasoning.
+
+**Milestone M7 (live result entry) — backend is complete; the mobile entry screen itself is
+not started.** `GET /events/{id}/squads/{sid}/runner`, `PUT
+/events/{id}/participants/{pid}/runs/{runNumber}`, `GET /events/{id}/entry-session`,
+`POST /events/{id}/entry-session/heartbeat` (`Comp.Api/Endpoints/LiveEntryEndpoints.cs`).
+Per section K: recording runs and the heartbeat are Super Admin/Admin/Official; the runner
+view and the session GET are open to any authenticated role.
+
+- **The runner view is the entry screen's only source of truth** (section G): it lists every
+  participant in the squad with every run slot's recorded/DNF/time state, computed fresh
+  from `Run` rows on every call — the app keeps no notion of progress of its own, which is
+  what makes resuming the same squad from a second phone work with no dedicated code.
+  `RunnerService.BuildParticipantResponse` builds one participant's view and is `internal
+  static` specifically so `RunService` can reuse it for `NextOutstanding` without
+  duplicating the shape.
+- **Saving a run returns who's next** (`SaveRunResponse.NextOutstanding`) so the app never
+  makes a separate round trip to ask. The advance algorithm
+  (`RunService.FindNextOutstandingAsync`) is a necessary extension beyond the doc's
+  pseudocode: it walks the squad in `PositionInSquad` order starting just after the
+  participant who was just saved, first looking for anyone still missing *that same run
+  number* (finish round 1 for the whole squad before anyone starts round 2), and only once
+  every run number that round is settled falls back to the first participant with any
+  outstanding run at all (loop back for run 2). Returns `null` once every participant's
+  every run is recorded, or if the participant isn't in a squad at all.
+- **Idempotency-Key header makes a retried save safe.** A dropped response after a
+  successful write is indistinguishable from a genuinely failed one from the app's side; if
+  the same key is presented again, `RunService` replays the original `Run` row and its
+  original `NextOutstanding` rather than re-applying whatever the retry's body says — this
+  is deliberate (a buggy or stale retry body can't silently overwrite a value), not just
+  an optimisation. The key is stored on the `Run` row itself, one key per row (a genuine
+  edit — same participant and run number, different save — gets no key or a new one, and
+  simply overwrites in place; overwriting an already-recorded time is allowed outright, per
+  section J, since the app confirms and shows the old value before calling this).
+- **Run number range and the finalised-event lock are both checked in the service** (a
+  clear 409 beats a raw constraint-violation 500 for the same cases the database trigger
+  from `docs/m2-wiring.md` also backs up) — validated directly here rather than only
+  through the trigger, matching the pattern M6 already established for its own writes.
+- **Entry sessions are a single row per event** (`EntrySession`, keyed by `EventId`,
+  upserted on every heartbeat) recording who's currently entering results and when they
+  last confirmed it — not a history, just current occupancy, so a second official opening
+  the same squad sees who's already on it. `GetAsync` returns an all-null response rather
+  than 404 when no one has ever sent a heartbeat for an otherwise-real event.
+- Tested end-to-end in `tests/Comp.Api.Tests/LiveEntryEndpointTests.cs` (12 tests): the
+  round-robin advance across two full rounds, DNF vs. a required raw time, overwriting a
+  run in place (one row, not two), idempotent replay ignoring a divergent retry body, the
+  run-number-out-of-range and finalised-event conflicts, the negative-authorization case,
+  and the entry-session heartbeat/read-back/unknown-event cases. 78/78 passing overall
+  (66 pre-existing + 12 new).
+- Deliberately not built yet: the actual mobile entry screen (sign-in, event list, squad
+  runner UI, the custom time keypad from section J) — this pass was the backend surface
+  only. That, plus the Expo/EAS Android-APK scaffold itself (decision D11), is the
+  remaining M7 work and the natural next session.
+
+Not yet built past M7's backend: the mobile client for M7, results/finalisation/standings
+persistence and endpoints (M8), output/hardening (M9).
 
 Do not build a competition-data write endpoint before deciding how it authenticates — the
 audit interceptor throws if `SaveChangesAsync` runs with no current user (and no
