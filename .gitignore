@@ -495,3 +495,7 @@ dist/
 .env
 .env.local
 appsettings.Development.local.json
+
+# Claude Code local session/tool state (permissions, scheduled-task locks) — machine-local,
+# not project config.
+/.claude/

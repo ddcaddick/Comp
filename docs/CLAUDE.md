@@ -628,6 +628,32 @@ an admin tool that happens to talk to the same API.
   sign-in, the shooter register, and Competitions all screenshotted against the real API
   and real data (the "Test Competition"/"Ada Lovelace" records from earlier testing).
 
+**Web admin gained Leagues UI**, the last real gap left over from M3 — `GET/POST
+/competitions/{id}/leagues` and `GET/PUT /leagues/{id}/members` have existed since M3 with
+nothing ever exposing them. Two new pages, both under a competition (sibling to
+`EventsPage`, sharing a new `CompetitionTabs` component so the two are one click apart):
+
+- `LeaguesPage` (`/competitions/:competitionId/leagues`) — list + a create form (name,
+  tier only; `pointsForFirst`/`pointsDecrement`/`dropWorstCount`/`absencesCountAsZero` are
+  all left `null` so the backend's own defaults apply — 50→−1 scoring, no drops, absences
+  count as zero — matching what a normal league actually wants, per the architecture doc's
+  settled decisions). Each row links to that league's roster.
+- `LeagueRosterPage` (`/competitions/:competitionId/leagues/:leagueId`) — the roster table
+  (`GET /leagues/{id}/members`) plus a shooter search (`GET /shooters?q=&active=true`) to
+  add one. `PUT /leagues/{id}/members` is full-replace, not an add/remove endpoint, so both
+  "Add" and "Remove" compute the next complete member-id list client-side from what's
+  already loaded and PUT that — there's no dedicated add/remove call to make. The search
+  result disables "Add" and labels it "Already in league" for existing members, and shows
+  a live `N/20 shooters` count against the architecture doc's D4 cap so a 409 from
+  exceeding it is more a confirmation of what the UI already showed than a surprise.
+  Assumes the shooter is already registered (via the Shooters page) — no inline
+  create-shooter here, unlike mobile's add-participant screen, since assigning an existing
+  register to leagues and registering a brand-new shooter are different enough workflows
+  to not conflate.
+- Verified end to end against the real API on the Android emulator's Chrome: created
+  "Division A" (tier 1, defaults applied), added Ada Lovelace to it, watched the count go
+  to 1/20 and the search immediately reflect "Already in league".
+
 Not yet built past M7: results/finalisation/standings persistence and endpoints (M8),
 output/hardening (M9), the actual EAS Android build and store submission (M10, per D11).
 
