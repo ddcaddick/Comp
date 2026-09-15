@@ -978,6 +978,30 @@ sign on as they arrive, not in a pre-planned order).
   `headerBackButtonDisplayMode`. Set to `"minimal"` (plus an empty `headerBackTitle`) globally
   in the root `_layout.tsx`, so every back button everywhere is just the arrow.
 
+**Web admin: nicknames preferred over full names in results/standings, and shooters are now
+editable.**
+
+- **`LeagueStandingResponse` and `EventParticipantResultResponse` both gained a `Nickname`**
+  field (the `Shooter.Nickname` that already existed, just never surfaced past the register
+  itself). `LeagueStandingsPage`, `EventResultsPage`, and the generated results PDF
+  (`lib/resultsPdf.tsx`) all now show a shooter's nickname instead of their full name when
+  one is set, via a shared `clients/web/src/lib/shooterName.tsx` (`ShooterName` component
+  for on-screen use — the full name shows as a native browser tooltip on hover via the
+  standard HTML `title` attribute, since nothing else in this codebase needed a custom
+  tooltip component yet; `preferredName()` as a plain-string version for the PDF, which has
+  no hover to offer). The Shooters register page itself is deliberately **unchanged** — it
+  already shows nickname as its own column alongside the full name, which is a genuinely
+  different, correct use case (viewing/managing the register) from a leaderboard's "what do
+  people actually call this shooter."
+- **Shooters can now be edited.** `PATCH /shooters/{id}` (Super Admin/Admin) already existed
+  and was never exposed on any client. `ShootersPage` gained an inline edit affordance — an
+  "Edit" button per row swaps that row's cells for inputs (first name, last name, nickname,
+  membership no.) plus Save/Cancel, avoiding a separate dialog component this codebase
+  doesn't have yet. Deliberately **does not** cover league membership: a shooter can be in a
+  different league in each competition simultaneously, so "edit this shooter's league" has
+  no single well-defined meaning — per explicit user direction, that's out of scope for now
+  and stays on the existing per-league Roster page.
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 
