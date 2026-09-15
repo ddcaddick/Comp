@@ -63,6 +63,12 @@ export default function RootLayout() {
                 contentStyle: { backgroundColor: colors.background },
                 headerStyle: { backgroundColor: colors.surface },
                 headerTintColor: colors.textPrimary,
+                // Otherwise the back button's label defaults to the previous screen's
+                // title, which for a screen pushed from inside the (tabs) group falls
+                // back to that group's own route name -- showing "tabs" instead of a
+                // plain back arrow.
+                headerBackButtonDisplayMode: "minimal",
+                headerBackTitle: "",
               }}
             />
           </AuthProvider>

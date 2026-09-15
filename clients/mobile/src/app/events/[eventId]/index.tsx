@@ -5,14 +5,18 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "
 import { api } from "@/lib/api";
 import { colors, fonts } from "@/lib/theme";
 
+// A heartbeat older than this is treated as a stale, no-longer-relevant session rather
+// than someone actively entering right now.
+const RECENT_SESSION_MINUTES = 10;
+
 function errorDetail(error: unknown, fallback: string): string {
   const detail = (error as { detail?: string | null } | undefined)?.detail;
   return detail ?? fallback;
 }
 
-// A heartbeat older than this is treated as a stale, no-longer-relevant session rather
-// than someone actively entering right now.
-const RECENT_SESSION_MINUTES = 10;
+function formatArrivalTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
 
 export default function SquadListScreen() {
   const { eventId, name } = useLocalSearchParams<{ eventId: string; name?: string }>();
@@ -78,14 +82,41 @@ export default function SquadListScreen() {
     onError: (err: Error) => setError(err.message),
   });
 
+  const completeSquad = useMutation({
+    mutationFn: async (squadId: string) => {
+      const { error } = await api.POST("/events/{id}/squads/{squadId}/complete", {
+        params: { path: { id: eventId, squadId } },
+      });
+      if (error) throw new Error(errorDetail(error, "Could not complete this squad."));
+    },
+    onSuccess: () => {
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ["squads", eventId] });
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
   const session = sessionQuery.data;
   const minutesAgo = session?.lastSeenAt
     ? Math.round((Date.now() - new Date(session.lastSeenAt).getTime()) / 60_000)
     : null;
   const showSessionBanner = session?.displayName && minutesAgo !== null && minutesAgo < RECENT_SESSION_MINUTES;
 
-  const unassigned = (participantsQuery.data ?? []).filter((p) => !p.squadId);
+  const participants = participantsQuery.data ?? [];
+  // Earliest sign-on first -- shooters are meant to be allocated to squads in the order
+  // they turned up, so the top of this list is who's been waiting longest.
+  const unassigned = participants
+    .filter((p) => !p.squadId)
+    .sort((a, b) => new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime());
   const squads = squadsQuery.data ?? [];
+  const openSquads = squads.filter((s) => s.status !== "Allocated");
+
+  const participantCountBySquad = new Map<string, number>();
+  for (const p of participants) {
+    if (p.squadId) {
+      participantCountBySquad.set(p.squadId, (participantCountBySquad.get(p.squadId) ?? 0) + 1);
+    }
+  }
 
   return (
     <View style={styles.container}>
@@ -129,11 +160,14 @@ export default function SquadListScreen() {
               <Text style={styles.sectionLabel}>Unassigned ({unassigned.length})</Text>
               {unassigned.map((participant) => (
                 <View key={participant.id} style={styles.unassignedRow}>
-                  <Text style={styles.unassignedName}>
-                    {participant.firstName} {participant.lastName}
-                  </Text>
+                  <View style={styles.unassignedHeader}>
+                    <Text style={styles.unassignedName}>
+                      {participant.firstName} {participant.lastName}
+                    </Text>
+                    <Text style={styles.unassignedTime}>{formatArrivalTime(participant.addedAt)}</Text>
+                  </View>
                   <View style={styles.chipRow}>
-                    {squads.map((squad) => (
+                    {openSquads.map((squad) => (
                       <Pressable
                         key={squad.id}
                         style={styles.chip}
@@ -143,27 +177,44 @@ export default function SquadListScreen() {
                         <Text style={styles.chipText}>{squad.name ?? `Squad ${squad.squadNumber}`}</Text>
                       </Pressable>
                     ))}
-                    {squads.length === 0 && <Text style={styles.chipHint}>Add a squad first</Text>}
+                    {openSquads.length === 0 && <Text style={styles.chipHint}>Add a squad first</Text>}
                   </View>
                 </View>
               ))}
             </View>
           ) : null
         }
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.row}
-            onPress={() =>
-              router.push({
-                pathname: "/events/[eventId]/squads/[squadId]",
-                params: { eventId, squadId: item.id },
-              })
-            }
-          >
-            <Text style={styles.rowTitle}>{item.name ?? `Squad ${item.squadNumber}`}</Text>
-            <Text style={styles.rowSubtitle}>{item.status}</Text>
-          </Pressable>
-        )}
+        renderItem={({ item }) => {
+          const isAllocated = item.status === "Allocated";
+          const count = participantCountBySquad.get(item.id) ?? 0;
+          return (
+            <View style={[styles.row, isAllocated && styles.rowAllocated]}>
+              <Pressable
+                style={styles.rowMain}
+                onPress={() =>
+                  router.push({
+                    pathname: "/events/[eventId]/squads/[squadId]",
+                    params: { eventId, squadId: item.id },
+                  })
+                }
+              >
+                <Text style={styles.rowTitle}>{item.name ?? `Squad ${item.squadNumber}`}</Text>
+                <Text style={styles.rowSubtitle}>
+                  {count} shooter{count === 1 ? "" : "s"} · {isAllocated ? "Allocated" : "Pending"}
+                </Text>
+              </Pressable>
+              {!isAllocated && (
+                <Pressable
+                  style={styles.completeButton}
+                  disabled={completeSquad.isPending}
+                  onPress={() => completeSquad.mutate(item.id)}
+                >
+                  <Text style={styles.completeButtonText}>Complete</Text>
+                </Pressable>
+              )}
+            </View>
+          );
+        }}
         ListEmptyComponent={
           !squadsQuery.isLoading ? <Text style={styles.empty}>No squads yet for this event.</Text> : null
         }
@@ -213,14 +264,34 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     gap: 8,
   },
+  unassignedHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   unassignedName: { fontFamily: fonts.semibold, fontSize: 15, color: colors.textPrimary },
+  unassignedTime: { fontFamily: fonts.monoMedium, fontSize: 11, color: colors.textMuted },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 14, backgroundColor: colors.chipBg },
   chipText: { fontFamily: fonts.monoMedium, fontSize: 12, color: colors.accent },
   chipHint: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
-  row: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 16, backgroundColor: colors.surface },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+  },
+  rowAllocated: { backgroundColor: colors.successBg, borderColor: colors.successBorder },
+  rowMain: { flex: 1, padding: 16 },
   rowTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.textPrimary },
   rowSubtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+  completeButton: {
+    marginRight: 14,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.warning,
+  },
+  completeButtonText: { fontFamily: fonts.monoBold, fontSize: 11, color: colors.warning },
   error: { color: colors.errorText, fontFamily: fonts.body, marginTop: 16 },
   empty: { textAlign: "center", color: colors.textSecondary, fontFamily: fonts.body, marginTop: 40 },
 });
