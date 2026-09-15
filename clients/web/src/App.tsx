@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from "./lib/auth";
 import { AppShell } from "./components/layout/AppShell";
 import { LoginPage } from "./routes/LoginPage";
 import { ShootersPage } from "./routes/ShootersPage";
+import { CompetitionsPage } from "./routes/CompetitionsPage";
+import { EventsPage } from "./routes/EventsPage";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +32,8 @@ export function App() {
             <Route element={<ProtectedLayout />}>
               <Route path="/" element={<Navigate to="/shooters" replace />} />
               <Route path="/shooters" element={<ShootersPage />} />
+              <Route path="/competitions" element={<CompetitionsPage />} />
+              <Route path="/competitions/:competitionId/events" element={<EventsPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

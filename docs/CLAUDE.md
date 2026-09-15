@@ -540,8 +540,33 @@ fixed:
   packages use. `app.json` also picked up an EAS project id and the `expo-font` config
   plugin automatically from actually running `expo start`/`expo export`.
 
-Not yet built past M7: results/finalisation/standings persistence and endpoints (M8),
-output/hardening (M9), the actual EAS Android build and store submission (M10, per D11).
+**Web admin gained Competitions and Events pages** (`routes/CompetitionsPage.tsx`,
+`routes/EventsPage.tsx`, wired into `App.tsx` and `AppShell`'s new nav bar) — the actual
+blocker the user hit trying to test the mobile app: M3 and M6 built the competitions/events
+backend, but no client had ever exposed *creating* one, so there was no way to get an event
+to point the mobile app at. Each page pairs a small create form with the existing list,
+using the same `useMutation`/`useQueryClient` pattern already established (mirrors
+`ShootersPage`'s `useQuery` conventions). `EventsPage` also has a one-button "Advance to
+{next status}" per event, computed client-side from the fixed Draft→Setup→InProgress→Review
+sequence (never offering Finalised — that's M8). Verified end-to-end on the Android emulator
+via Chrome (through `adb reverse tcp:5173`/`tcp:5200`, so the emulator's browser sees the
+dev server and API at the exact `localhost` origin the API's CORS policy already allows, no
+config changes needed): created a competition, created an event under it, and watched that
+event immediately show up in the mobile app's own event list.
+
+**Decision (15 Sep 2026):** per explicit user direction, squad and participant management
+(add a participant to an event, build/edit squads, move shooters between squads) will be
+built on **mobile**, not web — Officials are already permitted to do this per the security
+model (section K), and the architecture doc's M6 milestone already describes it as
+night-of-event work, it just hasn't been built on either client yet. Creating a competition
+or event itself stays web-only, Super Admin/Admin, per the security model — that is not a
+client-side choice, the backend rejects it for any other role regardless of which app asks.
+This is a deliberate, narrow extension of section J's "mobile stays small" boundary, not a
+reversal of it. **Not yet built**: the mobile squad/participant screens themselves — next up.
+
+Not yet built past M7: mobile squad/participant management (above), results/finalisation/
+standings persistence and endpoints (M8), output/hardening (M9), the actual EAS Android
+build and store submission (M10, per D11).
 
 Do not build a competition-data write endpoint before deciding how it authenticates — the
 audit interceptor throws if `SaveChangesAsync` runs with no current user (and no
