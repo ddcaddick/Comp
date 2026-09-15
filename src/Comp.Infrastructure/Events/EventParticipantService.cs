@@ -21,7 +21,7 @@ public class EventParticipantService(CompDbContext dbContext, ICurrentUserAccess
             .Join(dbContext.Shooters, p => p.ShooterId, s => s.Id, (p, s) => new { p, s })
             .OrderBy(x => x.p.SquadId).ThenBy(x => x.p.PositionInSquad)
             .Select(x => new EventParticipantResponse(
-                x.p.Id, x.s.Id, x.s.FirstName, x.s.LastName, x.p.LeagueId, x.p.SquadId, x.p.PositionInSquad))
+                x.p.Id, x.s.Id, x.s.FirstName, x.s.LastName, x.p.LeagueId, x.p.SquadId, x.p.PositionInSquad, x.p.AddedAt))
             .ToListAsync(cancellationToken);
     }
 
@@ -60,11 +60,16 @@ public class EventParticipantService(CompDbContext dbContext, ICurrentUserAccess
         int? positionInSquad = null;
         if (request.SquadId is not null)
         {
-            var squadExists = await dbContext.Squads
-                .AnyAsync(s => s.Id == request.SquadId && s.EventId == eventId, cancellationToken);
-            if (!squadExists)
+            var squad = await dbContext.Squads
+                .SingleOrDefaultAsync(s => s.Id == request.SquadId && s.EventId == eventId, cancellationToken);
+            if (squad is null)
             {
                 return new EventParticipantResult.Conflict("Squad does not belong to this event.");
+            }
+
+            if (squad.Status == SquadStatus.Allocated)
+            {
+                return new EventParticipantResult.Conflict("This squad is already allocated and closed to further additions.");
             }
 
             positionInSquad = await NextPositionInSquadAsync(request.SquadId.Value, cancellationToken);
@@ -115,11 +120,18 @@ public class EventParticipantService(CompDbContext dbContext, ICurrentUserAccess
         }
         else
         {
-            var squadExists = await dbContext.Squads
-                .AnyAsync(s => s.Id == request.SquadId && s.EventId == eventId, cancellationToken);
-            if (!squadExists)
+            var squad = await dbContext.Squads
+                .SingleOrDefaultAsync(s => s.Id == request.SquadId && s.EventId == eventId, cancellationToken);
+            if (squad is null)
             {
                 return new EventParticipantResult.Conflict("Squad does not belong to this event.");
+            }
+
+            // A squad already at Allocated has had sign-on closed off deliberately -- moving
+            // someone into it later would silently reopen a roster an official just locked.
+            if (squad.Status == SquadStatus.Allocated && participant.SquadId != squad.Id)
+            {
+                return new EventParticipantResult.Conflict("This squad is already allocated and closed to further additions.");
             }
 
             participant.SquadId = request.SquadId;
@@ -187,5 +199,6 @@ public class EventParticipantService(CompDbContext dbContext, ICurrentUserAccess
         shooter.LastName,
         participant.LeagueId,
         participant.SquadId,
-        participant.PositionInSquad);
+        participant.PositionInSquad,
+        participant.AddedAt);
 }

@@ -7,4 +7,5 @@ public record EventParticipantResponse(
     string LastName,
     Guid? LeagueId,
     Guid? SquadId,
-    int? PositionInSquad);
+    int? PositionInSquad,
+    DateTimeOffset AddedAt);
