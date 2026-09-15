@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { api } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { CompetitionTabs } from "../components/layout/CompetitionTabs";
+import { downloadStandingsPdf } from "../lib/standingsPdf";
 
 export function LeaguesPage() {
   const { competitionId } = useParams<{ competitionId: string }>();
@@ -12,6 +13,7 @@ export function LeaguesPage() {
   const [name, setName] = useState("");
   const [tier, setTier] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const competitionsQuery = useQuery({
     queryKey: ["competitions"],
@@ -34,6 +36,32 @@ export function LeaguesPage() {
     },
     enabled: !!competitionId,
   });
+
+  const standingsQueries = useQueries({
+    queries: (leaguesQuery.data ?? []).map((league) => ({
+      queryKey: ["league-standings", league.id],
+      queryFn: async () => {
+        const { data, error } = await api.GET("/leagues/{id}/standings", { params: { path: { id: league.id } } });
+        if (error) throw new Error("Failed to load standings");
+        return data;
+      },
+    })),
+  });
+  const allStandingsLoaded =
+    standingsQueries.length > 0 && standingsQueries.every((q) => q.isSuccess) && !!competition;
+
+  async function handleDownloadPdf() {
+    if (!allStandingsLoaded || !competition) return;
+    setDownloading(true);
+    try {
+      await downloadStandingsPdf({
+        competitionName: competition.name,
+        leagues: standingsQueries.map((q) => q.data!),
+      });
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   const createLeague = useMutation({
     mutationFn: async () => {
@@ -70,7 +98,12 @@ export function LeaguesPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-lg font-semibold">{competition ? competition.name : "Leagues"}</h1>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h1 className="text-lg font-semibold">{competition ? competition.name : "Leagues"}</h1>
+        <Button variant="outline" size="sm" disabled={downloading || !allStandingsLoaded} onClick={handleDownloadPdf}>
+          {downloading ? "Generating…" : "Download PDF"}
+        </Button>
+      </div>
       <CompetitionTabs competitionId={competitionId!} />
 
       <form
