@@ -111,6 +111,33 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
+// Development-only convenience: there is no registration endpoint and no seed data (by
+// design — user creation is otherwise always an authenticated Super Admin/Admin/Official
+// action), so a fresh local database has no account anyone could sign in with at all.
+// Runs once — it's a no-op the moment any user exists — and never runs outside
+// Development, so it can't create a predictable-password account anywhere that matters.
+// Also skipped whenever migrations haven't been applied yet: Comp.Api.Tests' own
+// WebApplicationFactory sets Development too, and starts the host (running this) against
+// a brand-new Testcontainers database *before* its own MigrateAsync call — querying
+// Users here first would hit "relation asp_net_users does not exist" and crash every
+// test. GetAppliedMigrationsAsync tolerates a missing history table (returns empty)
+// rather than throwing, unlike a direct query against a table that isn't there yet.
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<CompDbContext>();
+    var appliedMigrations = await dbContext.Database.GetAppliedMigrationsAsync();
+    if (appliedMigrations.Any() && !await dbContext.Users.AnyAsync())
+    {
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+        var devAdmin = new AppUser { UserName = "dev-admin@comp.local", Email = "dev-admin@comp.local", EmailConfirmed = true, DisplayName = "Dev Admin" };
+        dbContext.PendingActorOverride = devAdmin.Id;
+        await userManager.CreateAsync(devAdmin, "Comp1234!");
+        dbContext.PendingActorOverride = devAdmin.Id;
+        await userManager.AddToRoleAsync(devAdmin, Roles.SuperAdmin);
+    }
+}
+
 app.UseCors();
 app.UseRateLimiter();
 

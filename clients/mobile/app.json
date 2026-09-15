@@ -29,7 +29,14 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
-    ]
+      ],
+      "expo-font"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "13847d2b-a8b7-421d-aa1b-3f04f4a16699"
+      }
+    }
   }
 }

@@ -33,15 +33,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function login(email: string, password: string, rememberMe: boolean) {
-    const { data, error, response } = await api.POST("/auth/login", { body: { email, password } });
-    if (error || !data) {
-      const detail = (error as { detail?: string | null } | undefined)?.detail;
-      return { success: false as const, error: detail ?? `Login failed (${response.status}).` };
-    }
+    // A network-level failure (no route to the server, connection refused, timeout)
+    // rejects this promise instead of resolving with `error` — unlike an HTTP error
+    // response, which openapi-fetch reports through `error` below. Without this
+    // try/catch that rejection would propagate out of the caller's un-guarded `await
+    // login(...)`, skipping its `setSubmitting(false)` and leaving the button stuck
+    // on "Verifying" forever with no visible error.
+    try {
+      const { data, error, response } = await api.POST("/auth/login", { body: { email, password } });
+      if (error || !data) {
+        const detail = (error as { detail?: string | null } | undefined)?.detail;
+        return { success: false as const, error: detail ?? `Login failed (${response.status}).` };
+      }
 
-    await setTokens(data.accessToken, data.refreshToken, rememberMe);
-    setIsAuthenticated(true);
-    return { success: true as const };
+      await setTokens(data.accessToken, data.refreshToken, rememberMe);
+      setIsAuthenticated(true);
+      return { success: true as const };
+    } catch {
+      return { success: false as const, error: "Could not reach the server. Check your connection and try again." };
+    }
   }
 
   async function logout() {
