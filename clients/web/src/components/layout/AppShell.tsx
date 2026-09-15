@@ -1,16 +1,18 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router";
+import { Home, LogOut, Trophy, Users } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 import { cn } from "../../lib/cn";
 import { Button } from "../ui/button";
 
 const NAV_LINKS = [
-  { to: "/shooters", label: "Shooters" },
-  { to: "/competitions", label: "Competitions" },
+  { to: "/home", label: "Home", icon: Home },
+  { to: "/shooters", label: "Shooters", icon: Users },
+  { to: "/competitions", label: "Competitions", icon: Trophy },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-muted">
@@ -36,19 +38,24 @@ export function AppShell({ children }: { children: ReactNode }) {
                 to={link.to}
                 className={({ isActive }) =>
                   cn(
-                    "text-sm text-muted-foreground hover:text-foreground",
+                    "flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground",
                     isActive && "font-semibold text-primary hover:text-primary",
                   )
                 }
               >
+                <link.icon className="h-4 w-4" />
                 {link.label}
               </NavLink>
             ))}
           </nav>
         </div>
-        <Button variant="outline" size="sm" onClick={logout}>
-          Sign out
-        </Button>
+        <div className="flex items-center gap-4">
+          {user && <span className="text-sm text-muted-foreground">{user.displayName}</span>}
+          <Button variant="outline" size="sm" onClick={logout}>
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </Button>
+        </div>
       </header>
       <main className="p-6">{children}</main>
     </div>

@@ -1,16 +1,35 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { api, clearTokens, getTokens, setTokens } from "./api";
+import { decodeJwtPayload } from "./jwt";
+
+export interface CurrentUser {
+  displayName: string;
+  email: string;
+}
 
 interface AuthContextValue {
   isAuthenticated: boolean;
+  /** Decoded from the access token's own claims (display_name/email) -- display only, never
+   * trusted for authorization, which the server always re-checks against the bearer token. */
+  user: CurrentUser | null;
   login: (email: string, password: string) => Promise<{ success: true } | { success: false; error: string }>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function userFromAccessToken(accessToken: string | null): CurrentUser | null {
+  if (!accessToken) return null;
+  const payload = decodeJwtPayload(accessToken);
+  const displayName = payload?.display_name;
+  const email = payload?.email;
+  if (typeof displayName !== "string" || typeof email !== "string") return null;
+  return { displayName, email };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(() => getTokens().accessToken !== null);
+  const [user, setUser] = useState<CurrentUser | null>(() => userFromAccessToken(getTokens().accessToken));
 
   async function login(email: string, password: string) {
     const { data, error, response } = await api.POST("/auth/login", { body: { email, password } });
@@ -21,15 +40,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setTokens(data.accessToken, data.refreshToken);
     setIsAuthenticated(true);
+    setUser(userFromAccessToken(data.accessToken));
     return { success: true as const };
   }
 
   function logout() {
     clearTokens();
     setIsAuthenticated(false);
+    setUser(null);
   }
 
-  return <AuthContext.Provider value={{ isAuthenticated, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
