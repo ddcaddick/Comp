@@ -1,0 +1,167 @@
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { formatMillis } from "@comp/core";
+import type { components } from "@comp/api-types";
+import { api } from "@/lib/api";
+import { findInitialOutstanding } from "@/lib/squadRunner";
+
+type RunState = components["schemas"]["RunnerRunState"];
+
+export function runnerQueryKey(eventId: string, squadId: string) {
+  return ["runner", eventId, squadId] as const;
+}
+
+export default function SquadRunnerScreen() {
+  const { eventId, squadId } = useLocalSearchParams<{ eventId: string; squadId: string }>();
+  const router = useRouter();
+
+  const runnerQuery = useQuery({
+    queryKey: runnerQueryKey(eventId, squadId),
+    queryFn: async () => {
+      const { data, error } = await api.GET("/events/{id}/squads/{squadId}/runner", {
+        params: { path: { id: eventId, squadId } },
+      });
+      if (error) throw error;
+      return data ?? null;
+    },
+  });
+
+  useEffect(() => {
+    api.POST("/events/{id}/entry-session/heartbeat", { params: { path: { id: eventId } } });
+  }, [eventId]);
+
+  if (runnerQuery.isLoading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
+  if (runnerQuery.isError || !runnerQuery.data) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.error}>Could not load this squad.</Text>
+      </View>
+    );
+  }
+
+  const runner = runnerQuery.data;
+  const nextUp = findInitialOutstanding(runner.participants);
+
+  function goToEntry(participantId: string, firstName: string, lastName: string, run: RunState) {
+    router.push({
+      pathname: "/events/[eventId]/squads/[squadId]/entry",
+      params: {
+        eventId,
+        squadId,
+        participantId,
+        runNumber: String(run.runNumber),
+        firstName,
+        lastName,
+        existingRawTimeMs: run.rawTimeMs === null ? "" : String(run.rawTimeMs),
+        existingPenaltyCount: String(run.penaltyCount),
+        existingIsDnf: String(run.isDnf),
+        existingIsRecorded: String(run.isRecorded),
+      },
+    });
+  }
+
+  return (
+    <View style={styles.container}>
+      <Stack.Screen options={{ headerShown: true, title: runner.squadName ?? `Squad ${runner.squadNumber}` }} />
+
+      {nextUp && (
+        <Pressable
+          style={styles.nextUpCard}
+          onPress={() =>
+            goToEntry(
+              nextUp.participant.participantId,
+              nextUp.participant.firstName,
+              nextUp.participant.lastName,
+              nextUp.participant.runs[nextUp.runNumber - 1],
+            )
+          }
+        >
+          <Text style={styles.nextUpLabel}>Next up · Run {nextUp.runNumber}</Text>
+          <Text style={styles.nextUpName}>
+            {nextUp.participant.firstName} {nextUp.participant.lastName}
+          </Text>
+          <Text style={styles.nextUpAction}>Enter time →</Text>
+        </Pressable>
+      )}
+      {!nextUp && (
+        <View style={styles.doneCard}>
+          <Text style={styles.doneText}>Every run in this squad is recorded.</Text>
+        </View>
+      )}
+
+      <FlatList
+        data={runner.participants}
+        keyExtractor={(item) => item.participantId}
+        contentContainerStyle={styles.list}
+        renderItem={({ item }) => (
+          <View style={styles.row}>
+            <Text style={styles.rowName}>
+              {item.firstName} {item.lastName}
+            </Text>
+            <View style={styles.runCells}>
+              {item.runs.map((run) => (
+                <Pressable
+                  key={run.runNumber}
+                  style={[styles.runCell, run.isRecorded && styles.runCellRecorded]}
+                  onPress={() => goToEntry(item.participantId, item.firstName, item.lastName, run)}
+                >
+                  <Text style={styles.runCellText}>
+                    {run.isDnf ? "DNF" : run.isRecorded ? formatMillis(Number(run.rawTimeMs)) : `R${run.runNumber}`}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  error: { color: "#c0392b" },
+  nextUpCard: {
+    backgroundColor: "#208AEF",
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+  },
+  nextUpLabel: { color: "#DCEEFF", fontSize: 13, fontWeight: "600", textTransform: "uppercase" },
+  nextUpName: { color: "#fff", fontSize: 28, fontWeight: "700", marginTop: 4 },
+  nextUpAction: { color: "#DCEEFF", fontSize: 15, marginTop: 8 },
+  doneCard: { backgroundColor: "#E8F5E9", borderRadius: 12, padding: 20, marginBottom: 16 },
+  doneText: { color: "#256029", fontSize: 16, fontWeight: "600", textAlign: "center" },
+  list: { gap: 8, paddingBottom: 24 },
+  row: {
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    borderRadius: 10,
+    padding: 14,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  rowName: { fontSize: 16, fontWeight: "600", flex: 1 },
+  runCells: { flexDirection: "row", gap: 8 },
+  runCell: {
+    minWidth: 64,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: "#f0f0f0",
+    alignItems: "center",
+  },
+  runCellRecorded: { backgroundColor: "#DCEEFF" },
+  runCellText: { fontSize: 14, fontWeight: "600" },
+});
