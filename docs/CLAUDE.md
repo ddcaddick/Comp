@@ -8,11 +8,12 @@ Full design: `docs/architecture.md`. Read it before any structural change.
 ## Stack
 
 - **Backend:** .NET 10, ASP.NET Core Minimal APIs, EF Core 10 + Npgsql, PostgreSQL 16
-- **Web admin:** React 19 + Vite, TanStack Query, TanStack Table, React Router, Tailwind, shadcn/ui
-- **Mobile:** Expo / React Native, TypeScript. Prototyping phase targets **Android only**, as
-  a sideloadable APK via EAS Build's internal-distribution profile — no Apple/Google
-  developer account needed yet. Store submission on both platforms is still the eventual
-  goal; it's deferred to a later milestone (folded into M10), not dropped. See the
+- **Web admin:** React 19 + Vite, TanStack Query, TanStack Table, React Router, Tailwind, shadcn/ui,
+  `lucide-react` (nav/UI icons), `@react-pdf/renderer` (the one generated-PDF exception, D12)
+- **Mobile:** Expo / React Native, TypeScript, `@expo/vector-icons`. Prototyping phase targets
+  **Android only**, as a sideloadable APK via EAS Build's internal-distribution profile — no
+  Apple/Google developer account needed yet. Store submission on both platforms is still the
+  eventual goal; it's deferred to a later milestone (folded into M10), not dropped. See the
   architecture doc's decision D11.
 - **Shared clients code:** pnpm workspace under `clients/`
 
@@ -117,6 +118,19 @@ A wrong league table discovered in November, after ten months of events, is the 
 this project has available to it. Write the test.
 
 ## Current position
+
+**At a glance:** M0–M8 of the architecture doc's roadmap are complete — schema/audit/Identity,
+auth, the shooter register, competitions and leagues, the scoring engine, events/participants/
+squads, live result entry, and results/finalisation/standings — across the API, the web admin
+and the mobile app, each verified end-to-end on a real Android emulator/Expo Go session rather
+than trusted from typecheck and build output alone. Beyond the milestone plan itself: a
+generated results PDF (decision D12), a Home screen and real navigation on both clients (bottom
+tabs + icons on mobile, a matching Home page + nav icons on web), and a squad-allocation
+workflow (locking a squad's roster, arrival-ordered sign-on) added after actually using the
+mobile app for a real event's sign-on. Remaining: **M9** (hardening — CSV export, print
+stylesheets, rate limiting, an error-handling pass, a backup/restore test) and **M10** (pilot —
+the actual EAS Android build and store submission, per D11). The detailed log below is in the
+order it was built; skip to whatever milestone or feature name you need.
 
 Milestone M2 is complete. Delivered:
 
@@ -240,9 +254,6 @@ Milestone M2 is complete. Delivered:
     run here. Running `npx shadcn init`/`add` for real, or hand-building more primitives
     matching this same convention, are both reasonable next steps — just don't assume
     `components.json` or a shadcn-managed component tree exists yet.
-  - Moved `clients/mobile/api/api-types.ts` to the new `@comp/api-types` workspace
-    package (see the OpenAPI bullet above) so `web` could depend on it without reaching
-    into a sibling app's folder.
   - Moved `clients/mobile/api/api-types.ts` to the new `@comp/api-types` workspace
     package (see the OpenAPI bullet above) so `web` could depend on it without reaching
     into a sibling app's folder.
@@ -409,10 +420,11 @@ view and the session GET are open to any authenticated role.
 SDK 57 — scaffolded via `create-expo-app` and then stripped back to just what section J's
 screens need (its demo tabs/components/assets, its own nested `.git`, and its bundled
 `AGENTS.md`/`CLAUDE.md` were all deleted; this repo's own `docs/CLAUDE.md` is the only one
-that applies). Screens: sign-in (`app/index.tsx`) → event list (`app/events/index.tsx`) →
-squad list (`app/events/[eventId]/index.tsx`) → squad runner
+that applies). Screens as originally built: sign-in (`app/index.tsx`) → event list
+(`app/events/index.tsx`) → squad list (`app/events/[eventId]/index.tsx`) → squad runner
 (`app/events/[eventId]/squads/[squadId]/index.tsx`) → entry
-(`.../squads/[squadId]/entry.tsx`).
+(`.../squads/[squadId]/entry.tsx`). (The event list later moved to `app/(tabs)/events.tsx`
+when a Home screen and tab bar were added — see further down.)
 
 - **Auth mirrors the web app's pattern** (`lib/api.ts`/`lib/auth.tsx`) — same `openapi-fetch`
   client, same login/401-refresh/retry interceptor — with one necessary difference:
