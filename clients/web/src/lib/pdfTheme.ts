@@ -1,4 +1,9 @@
 import { StyleSheet } from "@react-pdf/renderer";
+import clubBadgeUrlAsset from "../assets/club-badge.png";
+
+// react-pdf's <Image> fetches this URL itself at render time (a same-origin Vite-bundled asset
+// URL, so no CORS concern) -- shared so the badge is pixel-identical across every generated PDF.
+export const clubBadgeUrl = clubBadgeUrlAsset;
 
 // The ShooterRSG dark palette (clients/web/src/index.css / clients/mobile/src/lib/theme.ts),
 // repeated here rather than imported: react-pdf styles are plain objects evaluated outside
@@ -15,6 +20,8 @@ export const colors = {
 
 export const pdfStyles = StyleSheet.create({
   page: { backgroundColor: colors.page, color: colors.text, padding: 24, fontSize: 8, fontFamily: "Helvetica" },
+  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  clubBadge: { width: 52, height: 52 },
   title: { fontSize: 16, fontFamily: "Helvetica-Bold", color: colors.text },
   heading: { fontSize: 11, fontFamily: "Helvetica-Bold", color: colors.accent, marginTop: 2 },
   subtitle: { fontSize: 9, color: colors.textMuted, marginTop: 2, marginBottom: 14 },

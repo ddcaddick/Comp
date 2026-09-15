@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { colors, fonts } from "@/lib/theme";
@@ -57,13 +57,16 @@ export default function HomeScreen() {
             SHOOTER<Text style={{ color: colors.accent }}>RSG</Text>
           </Text>
         </View>
-        <View style={styles.welcomeBlock}>
-          <Text style={styles.welcomeText} numberOfLines={1}>
-            Welcome, {user?.displayName ?? "there"}
-          </Text>
-          <Pressable onPress={logout} hitSlop={8}>
-            <Text style={styles.signOut}>Sign out</Text>
-          </Pressable>
+        <View style={styles.topRow}>
+          <Image source={require("../../../assets/images/club-badge.png")} style={styles.clubBadge} resizeMode="contain" />
+          <View style={styles.welcomeBlock}>
+            <Text style={styles.welcomeText} numberOfLines={1}>
+              Welcome, {user?.displayName ?? "there"}
+            </Text>
+            <Pressable onPress={logout} hitSlop={8}>
+              <Text style={styles.signOut}>Sign out</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -113,6 +116,8 @@ const styles = StyleSheet.create({
   badge: { width: 32, height: 32, borderRadius: 8, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" },
   badgeText: { fontFamily: fonts.extrabold, fontSize: 13, color: colors.accentText, letterSpacing: -0.5 },
   wordmark: { fontFamily: fonts.extrabold, fontSize: 13, letterSpacing: 2, color: colors.textPrimary },
+  topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
+  clubBadge: { width: 56, height: 56 },
   welcomeBlock: { alignItems: "flex-end", gap: 4 },
   welcomeText: { fontFamily: fonts.semibold, fontSize: 17, color: colors.textPrimary },
   signOut: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent },

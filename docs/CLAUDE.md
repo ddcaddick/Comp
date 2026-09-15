@@ -1089,6 +1089,33 @@ own orphaned `assets/images/favicon.png` (unused — `app.json` has no `web` sec
 builds a web target for this app) was updated to the same badge too, purely for consistency in
 case that ever changes.
 
+**Both home screens, and both generated PDFs, now show the club's real badge** (the user's own
+Wednesbury Marksmen logo, supplied as an image and committed as `clients/mobile/assets/images/
+club-badge.png` — the single source of truth both clients and the PDFs copy or import from,
+rather than three independent copies).
+
+- **Mobile Home** (`app/(tabs)/home.tsx`): the header's second row, previously just the
+  right-aligned welcome block, is now a `topRow` (`flexDirection: "row"`,
+  `justifyContent: "space-between"`) with the badge (`Image`, 56×56, `resizeMode="contain"`) on
+  the left and the unchanged welcome block on the right — opposite it, at a comparable visual
+  weight, per explicit user direction.
+- **Web Home** (`routes/HomePage.tsx`): the same idea via a flex row wrapping the existing
+  welcome `<h1>`/`<p>` and a new `<img>` (`clients/web/src/assets/club-badge.png`, imported as a
+  Vite asset so it's hashed and bundled rather than served from `public/`, since — unlike the
+  favicon below — this one is real page content, not a browser-chrome asset).
+- **Both generated PDFs** (`lib/resultsPdf.tsx`, `lib/standingsPdf.tsx`): a new shared
+  `pdfStyles.titleRow`/`pdfStyles.clubBadge` in `pdfTheme.ts` wraps each PDF's existing
+  title/heading/subtitle block and a `<Image src={clubBadgeUrl} />` (react-pdf fetches the
+  Vite-bundled same-origin URL itself at render time) into one row — the text stays where it
+  was, the badge sits top-right, vertically level with the competition name, per explicit user
+  direction. `clubBadgeUrl` is exported once from `pdfTheme.ts` so both PDFs reference the
+  identical asset.
+- Verified end-to-end: both home screens on the Android emulator (mobile via a live Expo Go
+  session — confirmed the new "SR" launcher icon appears on Expo Go's own bundling splash
+  screen too, a free side-effect of the earlier icon work; web via Chrome through `adb reverse`),
+  and both PDFs downloaded and opened for real finalised-event demo data, confirming the badge
+  renders correctly top-right of "Mini Rifle" in each.
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 
