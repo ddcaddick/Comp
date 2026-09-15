@@ -3,6 +3,7 @@ import { Redirect, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { colors, fonts } from "@/lib/theme";
 
 export default function EventListScreen() {
   const { isLoading: authLoading, isAuthenticated, logout } = useAuth();
@@ -21,7 +22,7 @@ export default function EventListScreen() {
   if (authLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -41,7 +42,7 @@ export default function EventListScreen() {
         </Pressable>
       </View>
 
-      {eventsQuery.isLoading && <ActivityIndicator style={styles.spinner} />}
+      {eventsQuery.isLoading && <ActivityIndicator color={colors.accent} style={styles.spinner} />}
       {eventsQuery.isError && <Text style={styles.error}>Could not load events.</Text>}
 
       <FlatList
@@ -68,16 +69,16 @@ export default function EventListScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 60, paddingHorizontal: 20 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  container: { flex: 1, backgroundColor: colors.background, paddingTop: 60, paddingHorizontal: 20 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  title: { fontSize: 28, fontWeight: "700" },
-  signOut: { color: "#208AEF", fontSize: 16 },
+  title: { fontFamily: fonts.bold, fontSize: 28, color: colors.textPrimary },
+  signOut: { color: colors.accent, fontFamily: fonts.medium, fontSize: 15 },
   spinner: { marginTop: 24 },
   list: { gap: 8, paddingBottom: 24 },
-  row: { borderWidth: 1, borderColor: "#e0e0e0", borderRadius: 10, padding: 16 },
-  rowTitle: { fontSize: 17, fontWeight: "600" },
-  rowSubtitle: { fontSize: 14, color: "#666", marginTop: 4 },
-  error: { color: "#c0392b", marginTop: 16 },
-  empty: { textAlign: "center", color: "#666", marginTop: 40 },
+  row: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 16, backgroundColor: colors.surface },
+  rowTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.textPrimary },
+  rowSubtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+  error: { color: colors.errorText, fontFamily: fonts.body, marginTop: 16 },
+  empty: { textAlign: "center", color: colors.textSecondary, fontFamily: fonts.body, marginTop: 40 },
 });

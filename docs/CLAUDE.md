@@ -400,6 +400,7 @@ view and the session GET are open to any authenticated role.
   run-number-out-of-range and finalised-event conflicts, the negative-authorization case,
   and the entry-session heartbeat/read-back/unknown-event cases. 78/78 passing overall
   (66 pre-existing + 12 new).
+
 **The mobile app** (`clients/mobile`) is a new pnpm workspace member — Expo Router, TypeScript,
 SDK 57 — scaffolded via `create-expo-app` and then stripped back to just what section J's
 screens need (its demo tabs/components/assets, its own nested `.git`, and its bundled
@@ -455,6 +456,43 @@ squad list (`app/events/[eventId]/index.tsx`) → squad runner
   emulator or device — there wasn't one available in this environment. Run
   `pnpm --filter mobile start` and open it in Expo Go or an Android emulator before trusting
   the UI itself; only its types, logic, and bundling are confirmed so far.
+
+**Visual design** now follows a real mock the user supplied (a "ShooterRSG" sign-in screen,
+built with Claude's design tool) rather than the plain default styling above — applied
+exactly to sign-in, and extended by judgment to every other screen since only sign-in was
+mocked.
+
+- `lib/theme.ts` holds the design tokens pulled from the mock: a near-black ground
+  (`#0b0c0f`/`#141519`), an orange accent (`#ff8a3d`), Archivo for headings/body, JetBrains
+  Mono for labels and small monospace accents (loaded via `@expo-google-fonts/archivo` and
+  `@expo-google-fonts/jetbrains-mono` in `_layout.tsx`, which keeps the splash screen up
+  until they're ready). `app.json`'s `userInterfaceStyle` is `"dark"` (the mock has no light
+  variant) and its splash/adaptive-icon background colors were updated to match.
+- The sign-in screen's hero image (`assets/images/sign-in-hero.png`) was extracted from the
+  mock artifact's own asset bundle — the user confirmed they hold the rights to it before it
+  was committed. Layered under a `expo-linear-gradient` fade rather than the mock's CSS
+  `mix-blend-mode`/`radial-gradient`, which have no React Native equivalent.
+- Two things in the mock don't correspond to real backend behaviour, resolved with the
+  user's explicit steer: the **"Use passkey" option was dropped entirely** (no passkey
+  support exists), and **"Forgot password" is a live link that shows a message** ("contact
+  your club administrator") rather than a dead link, since there's no password-reset
+  endpoint. The mock's demo lockout-after-3-attempts logic was also not ported — the real
+  `/auth/login` endpoint already has its own rate limiting and Identity lockout.
+- **"Keep me signed in" is real, not decorative**: `lib/tokenStore.ts`'s `setTokens` takes a
+  `persist` flag — off, the session works normally for this app launch (tokens still live in
+  the in-memory copy every request reads) but nothing is written to `SecureStore`, and any
+  previously-persisted session is cleared so it can't reappear on the next launch. A token
+  refresh omits the flag and reuses whichever choice was last made explicitly, so the
+  behaviour survives the access-token boundary without the refresh flow needing to know
+  about it.
+- The mock's fake iPhone status bar, its "SESSION OPEN" success card (login here just
+  redirects to the event list immediately, matching the rest of the app), and its
+  Terms/Privacy footer links (no such pages exist) were left out as artifacts of previewing
+  a static mock rather than real app chrome.
+- The other four screens (event list, squad list, squad runner, entry) were re-themed to the
+  same tokens — dark backgrounds, the orange accent on primary actions, Archivo/JetBrains
+  Mono throughout — without changing their layout or behaviour, since only sign-in had a
+  mock to match.
 
 Not yet built past M7: results/finalisation/standings persistence and endpoints (M8),
 output/hardening (M9), the actual EAS Android build and store submission (M10, per D11).

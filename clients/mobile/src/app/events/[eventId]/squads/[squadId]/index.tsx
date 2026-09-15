@@ -6,6 +6,7 @@ import { formatMillis } from "@comp/core";
 import type { components } from "@comp/api-types";
 import { api } from "@/lib/api";
 import { findInitialOutstanding } from "@/lib/squadRunner";
+import { colors, fonts } from "@/lib/theme";
 
 type RunState = components["schemas"]["RunnerRunState"];
 
@@ -35,7 +36,7 @@ export default function SquadRunnerScreen() {
   if (runnerQuery.isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -128,40 +129,50 @@ export default function SquadRunnerScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  error: { color: "#c0392b" },
+  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 20, paddingTop: 16 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
+  error: { color: colors.errorText, fontFamily: fonts.body },
   nextUpCard: {
-    backgroundColor: "#208AEF",
+    backgroundColor: colors.accent,
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
   },
-  nextUpLabel: { color: "#DCEEFF", fontSize: 13, fontWeight: "600", textTransform: "uppercase" },
-  nextUpName: { color: "#fff", fontSize: 28, fontWeight: "700", marginTop: 4 },
-  nextUpAction: { color: "#DCEEFF", fontSize: 15, marginTop: 8 },
-  doneCard: { backgroundColor: "#E8F5E9", borderRadius: 12, padding: 20, marginBottom: 16 },
-  doneText: { color: "#256029", fontSize: 16, fontWeight: "600", textAlign: "center" },
+  nextUpLabel: {
+    color: colors.accentText,
+    fontFamily: fonts.monoBold,
+    fontSize: 11,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+    opacity: 0.75,
+  },
+  nextUpName: { color: colors.accentText, fontFamily: fonts.extrabold, fontSize: 28, marginTop: 4 },
+  nextUpAction: { color: colors.accentText, fontFamily: fonts.semibold, fontSize: 15, marginTop: 8, opacity: 0.85 },
+  doneCard: { backgroundColor: colors.successBg, borderWidth: 1, borderColor: colors.successBorder, borderRadius: 12, padding: 20, marginBottom: 16 },
+  doneText: { color: colors.success, fontFamily: fonts.semibold, fontSize: 16, textAlign: "center" },
   list: { gap: 8, paddingBottom: 24 },
   row: {
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: colors.border,
     borderRadius: 10,
     padding: 14,
+    backgroundColor: colors.surface,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  rowName: { fontSize: 16, fontWeight: "600", flex: 1 },
+  rowName: { fontFamily: fonts.semibold, fontSize: 16, color: colors.textPrimary, flex: 1 },
   runCells: { flexDirection: "row", gap: 8 },
   runCell: {
     minWidth: 64,
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderRadius: 8,
-    backgroundColor: "#f0f0f0",
+    backgroundColor: colors.inputBg,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
   },
-  runCellRecorded: { backgroundColor: "#DCEEFF" },
-  runCellText: { fontSize: 14, fontWeight: "600" },
+  runCellRecorded: { backgroundColor: colors.chipBg, borderColor: colors.accent },
+  runCellText: { fontFamily: fonts.monoMedium, fontSize: 13, color: colors.textPrimary },
 });
