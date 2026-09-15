@@ -19,4 +19,9 @@ public interface ISquadService
 
     /// <summary>Null return means the event itself doesn't exist.</summary>
     Task<IReadOnlyList<SquadResponse>?> ListAsync(Guid eventId, CancellationToken cancellationToken);
+
+    /// <summary>Locks the squad's roster (<see cref="Comp.Domain.Enums.SquadStatus.Allocated"/>) so no
+    /// further shooters can be assigned into it. Idempotent -- completing an already-allocated
+    /// squad just returns it unchanged rather than conflicting.</summary>
+    Task<SquadResult> CompleteAsync(Guid eventId, Guid squadId, CancellationToken cancellationToken);
 }

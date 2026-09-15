@@ -255,6 +255,78 @@ public class EventParticipantAndSquadEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Completing_a_squad_locks_it_and_is_idempotent()
+    {
+        var @event = await CreateEventAsync(12);
+        var squad = await CreateSquadAsync(@event.Id);
+
+        var complete = await _admin.PostAsync($"/events/{@event.Id}/squads/{squad.Id}/complete", content: null);
+        complete.EnsureSuccessStatusCode();
+        Assert.Equal("Allocated", (await complete.Content.ReadFromJsonAsync<SquadResponse>())!.Status);
+
+        // Completing an already-allocated squad is a no-op success, not a conflict.
+        var again = await _admin.PostAsync($"/events/{@event.Id}/squads/{squad.Id}/complete", content: null);
+        again.EnsureSuccessStatusCode();
+        Assert.Equal("Allocated", (await again.Content.ReadFromJsonAsync<SquadResponse>())!.Status);
+    }
+
+    [Fact]
+    public async Task Completing_an_unknown_squad_or_event_returns_404()
+    {
+        var @event = await CreateEventAsync(13);
+
+        var unknownSquad = await _admin.PostAsync($"/events/{@event.Id}/squads/{Guid.NewGuid()}/complete", content: null);
+        Assert.Equal(HttpStatusCode.NotFound, unknownSquad.StatusCode);
+
+        var unknownEvent = await _admin.PostAsync($"/events/{Guid.NewGuid()}/squads/{Guid.NewGuid()}/complete", content: null);
+        Assert.Equal(HttpStatusCode.NotFound, unknownEvent.StatusCode);
+    }
+
+    [Fact]
+    public async Task Assigning_a_participant_into_an_allocated_squad_returns_a_conflict()
+    {
+        var @event = await CreateEventAsync(14);
+        var squad = await CreateSquadAsync(@event.Id);
+        var alreadyIn = await CreateShooterAsync("Already", "Allocated");
+        var alreadyInParticipant = await AddParticipantAsync(@event.Id, alreadyIn.Id);
+        await _admin.PatchAsJsonAsync($"/events/{@event.Id}/participants/{alreadyInParticipant.Id}", new { squadId = squad.Id });
+
+        var completeResponse = await _admin.PostAsync($"/events/{@event.Id}/squads/{squad.Id}/complete", content: null);
+        completeResponse.EnsureSuccessStatusCode();
+
+        // Adding a brand-new participant straight into the now-allocated squad is refused...
+        var newShooter = await CreateShooterAsync("Turned", "UpLate");
+        var addDirect = await _admin.PostAsJsonAsync($"/events/{@event.Id}/participants",
+            new { shooterId = newShooter.Id, squadId = squad.Id });
+        Assert.Equal(HttpStatusCode.Conflict, addDirect.StatusCode);
+
+        // ...and so is moving an already-unassigned participant into it afterwards.
+        var unassignedShooter = await CreateShooterAsync("Still", "Waiting");
+        var unassignedParticipant = await AddParticipantAsync(@event.Id, unassignedShooter.Id);
+        var move = await _admin.PatchAsJsonAsync($"/events/{@event.Id}/participants/{unassignedParticipant.Id}", new { squadId = squad.Id });
+        Assert.Equal(HttpStatusCode.Conflict, move.StatusCode);
+
+        // But a participant already in the squad before it was allocated can still have their
+        // position adjusted within it -- re-submitting the same squadId isn't "moving in".
+        var reorder = await _admin.PatchAsJsonAsync($"/events/{@event.Id}/participants/{alreadyInParticipant.Id}",
+            new { squadId = squad.Id, positionInSquad = 5 });
+        reorder.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Participants_expose_when_they_were_added()
+    {
+        var @event = await CreateEventAsync(15);
+        var before = DateTimeOffset.UtcNow.AddMinutes(-1);
+
+        var shooter = await CreateShooterAsync("Arrival", "Time");
+        var participant = await AddParticipantAsync(@event.Id, shooter.Id);
+
+        Assert.True(participant.AddedAt > before);
+        Assert.True(participant.AddedAt <= DateTimeOffset.UtcNow.AddMinutes(1));
+    }
+
+    [Fact]
     public async Task Listing_squads_and_participants_for_an_unknown_event_returns_404()
     {
         Assert.Equal(HttpStatusCode.NotFound, (await _admin.GetAsync($"/events/{Guid.NewGuid()}/squads")).StatusCode);
@@ -267,8 +339,12 @@ public class EventParticipantAndSquadEndpointTests : IAsyncLifetime
         var @event = await CreateEventAsync(11);
         var shooter = await CreateShooterAsync("Locked", "Out");
         var participant = await AddParticipantAsync(@event.Id, shooter.Id);
+        var squad = await CreateSquadAsync(@event.Id);
 
         await SetEventStatusDirectlyAsync(@event.Id, EventStatus.Finalised);
+
+        var complete = await _admin.PostAsync($"/events/{@event.Id}/squads/{squad.Id}/complete", content: null);
+        Assert.Equal(HttpStatusCode.Conflict, complete.StatusCode);
 
         var addAnother = await _admin.PostAsJsonAsync($"/events/{@event.Id}/participants",
             new { shooterId = (await CreateShooterAsync("Also", "Locked")).Id });
