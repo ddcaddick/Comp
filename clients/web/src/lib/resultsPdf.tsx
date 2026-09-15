@@ -1,6 +1,7 @@
 import { Document, Page, StyleSheet, Text, View, pdf } from "@react-pdf/renderer";
 import { formatMillis } from "@comp/core";
 import type { components } from "@comp/api-types";
+import { preferredName } from "./shooterName";
 
 type Participant = components["schemas"]["EventParticipantResultResponse"];
 
@@ -58,9 +59,7 @@ function OverallTable({ participants }: { participants: Participant[] }) {
       {sorted.map((p) => (
         <View key={p.participantId} style={styles.row}>
           <Text style={[styles.cell, { width: "14%" }]}>{p.status === "Dnf" ? "—" : p.overallPosition}</Text>
-          <Text style={[styles.cell, { width: "46%" }]}>
-            {p.firstName} {p.lastName}
-          </Text>
+          <Text style={[styles.cell, { width: "46%" }]}>{preferredName(p)}</Text>
           <Text style={[styles.cellMuted, { width: "24%" }]}>{p.leagueName ?? "—"}</Text>
           <Text style={[p.status === "Dnf" ? styles.dnf : styles.cell, { width: "16%", textAlign: "right" }]}>
             {timeOrDnf(p)}
@@ -90,9 +89,7 @@ function LeagueTile({ leagueName, participants }: { leagueName: string; particip
       {sorted.map((p) => (
         <View key={p.participantId} style={styles.row}>
           <Text style={[styles.cell, { width: "14%" }]}>{p.status === "Dnf" ? "—" : p.leaguePosition}</Text>
-          <Text style={[styles.cell, { width: "42%" }]}>
-            {p.firstName} {p.lastName}
-          </Text>
+          <Text style={[styles.cell, { width: "42%" }]}>{preferredName(p)}</Text>
           <Text style={[p.status === "Dnf" ? styles.dnf : styles.cell, { width: "22%", textAlign: "right" }]}>
             {timeOrDnf(p)}
           </Text>

@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import { downloadResultsPdf } from "../lib/resultsPdf";
 import { Button } from "../components/ui/button";
 import { CompetitionTabs } from "../components/layout/CompetitionTabs";
+import { ShooterName } from "../lib/shooterName";
 
 export function EventResultsPage() {
   const { competitionId, eventId } = useParams<{ competitionId: string; eventId: string }>();
@@ -140,7 +141,7 @@ export function EventResultsPage() {
               <tr key={p.participantId} className="border-b border-border">
                 <td className="py-2 pr-4">{(leagueId ? p.leaguePosition : p.overallPosition) ?? "—"}</td>
                 <td className="py-2 pr-4">
-                  {p.firstName} {p.lastName}
+                  <ShooterName shooter={p} />
                 </td>
                 <td className="py-2 pr-4">{p.leagueName ?? "—"}</td>
                 <td className="py-2 pr-4">{p.eventTimeMs != null ? formatMillis(Number(p.eventTimeMs)) : "DNF"}</td>

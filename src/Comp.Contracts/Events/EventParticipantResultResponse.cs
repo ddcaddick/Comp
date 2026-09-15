@@ -10,6 +10,7 @@ public record EventParticipantResultResponse(
     Guid ShooterId,
     string FirstName,
     string LastName,
+    string? Nickname,
     Guid? LeagueId,
     string? LeagueName,
     string Status,

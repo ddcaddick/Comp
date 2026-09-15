@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { api } from "../lib/api";
 import { CompetitionTabs } from "../components/layout/CompetitionTabs";
+import { ShooterName } from "../lib/shooterName";
 
 export function LeagueStandingsPage() {
   const { competitionId, leagueId } = useParams<{ competitionId: string; leagueId: string }>();
@@ -50,7 +51,7 @@ export function LeagueStandingsPage() {
               <tr key={s.shooterId} className="border-b border-border">
                 <td className="py-2 pr-4">{s.position}</td>
                 <td className="py-2 pr-4">
-                  {s.firstName} {s.lastName}
+                  <ShooterName shooter={s} />
                   {s.isProvisional && <span className="ml-2 text-xs text-muted-foreground">(provisional)</span>}
                 </td>
                 <td className="py-2 pr-4">{s.countingTotal}</td>
