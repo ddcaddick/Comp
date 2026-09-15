@@ -16,14 +16,44 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// The Vite dev server runs on 5173. The Expo app talks to the API over the LAN
-// and does not send an Origin header, so it needs no entry here.
+// Locally this is already the Host=...;Port=...; form Npgsql expects. Render's managed
+// Postgres (and most other hosts) hand out a postgres:// URI instead, which UseNpgsql
+// cannot parse directly -- converted here rather than asking every environment to agree
+// on one format.
+static string NormalizeConnectionString(string raw)
+{
+    if (!raw.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) &&
+        !raw.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    {
+        return raw;
+    }
+
+    var uri = new Uri(raw);
+    var userInfo = uri.UserInfo.Split(':', 2);
+    var connectionStringBuilder = new NpgsqlConnectionStringBuilder
+    {
+        Host = uri.Host,
+        Port = uri.Port > 0 ? uri.Port : 5432,
+        Database = uri.AbsolutePath.TrimStart('/'),
+        Username = Uri.UnescapeDataString(userInfo[0]),
+        Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : null,
+        SslMode = SslMode.Require
+    };
+    return connectionStringBuilder.ConnectionString;
+}
+
+// A comma-separated list so a staging deployment can allow its own web origin alongside
+// (or instead of) the local Vite dev server -- the Expo app talks to the API directly and
+// sends no Origin header, so it needs no entry here regardless of environment.
+var corsOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "http://localhost:5173")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy => policy
-        .WithOrigins("http://localhost:5173")
+        .WithOrigins(corsOrigins)
         .AllowAnyHeader()
         .AllowAnyMethod()));
 
@@ -35,7 +65,7 @@ builder.Services.AddScoped<AuditSaveChangesInterceptor>();
 // from the provider passed into this callback rather than captured once at startup.
 builder.Services.AddDbContext<CompDbContext>((sp, options) =>
     options
-        .UseNpgsql(builder.Configuration.GetConnectionString("Default"))
+        .UseNpgsql(NormalizeConnectionString(builder.Configuration.GetConnectionString("Default")!))
         .UseSnakeCaseNamingConvention()
         .AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>()));
 
@@ -112,30 +142,47 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
-// Development-only convenience: there is no registration endpoint and no seed data (by
-// design — user creation is otherwise always an authenticated Super Admin/Admin/Official
-// action), so a fresh local database has no account anyone could sign in with at all.
-// Runs once — it's a no-op the moment any user exists — and never runs outside
-// Development, so it can't create a predictable-password account anywhere that matters.
-// Also skipped whenever migrations haven't been applied yet: Comp.Api.Tests' own
-// WebApplicationFactory sets Development too, and starts the host (running this) against
-// a brand-new Testcontainers database *before* its own MigrateAsync call — querying
-// Users here first would hit "relation asp_net_users does not exist" and crash every
-// test. GetAppliedMigrationsAsync tolerates a missing history table (returns empty)
-// rather than throwing, unlike a direct query against a table that isn't there yet.
-if (app.Environment.IsDevelopment())
+// Off by default -- locally and in tests, migrations are applied explicitly (`dotnet ef
+// database update`, or the test's own MigrateAsync). A deployed environment with no shell
+// access to run that command opts in with RunMigrationsOnStartup=true instead. Safe to
+// run on every boot: EF Core's migrator is a no-op once the database is already current.
+if (builder.Configuration.GetValue<bool>("RunMigrationsOnStartup"))
+{
+    using var migrationScope = app.Services.CreateScope();
+    await migrationScope.ServiceProvider.GetRequiredService<CompDbContext>().Database.MigrateAsync();
+}
+
+// There is no registration endpoint and no seed data by design (user creation is otherwise
+// always an authenticated Super Admin/Admin/Official action), so a fresh database has no
+// account anyone could sign in with at all. This creates exactly one bootstrap Super Admin,
+// and only: locally in Development (the fixed dev-admin@comp.local / Comp1234! convenience
+// this project has always used), or wherever SeedInitialAdmin=true is set explicitly and an
+// InitialAdmin:Email/:Password have been configured -- e.g. a staging deployment reachable
+// from the internet, where the well-known local dev credentials must never apply. Runs once
+// (a no-op the moment any user exists) and is skipped whenever migrations haven't been
+// applied yet: Comp.Api.Tests' own WebApplicationFactory sets Development too, and starts
+// the host (running this) against a brand-new Testcontainers database *before* its own
+// MigrateAsync call — querying Users here first would hit "relation asp_net_users does not
+// exist" and crash every test. GetAppliedMigrationsAsync tolerates a missing history table
+// (returns empty) rather than throwing, unlike a direct query against a table that isn't
+// there yet.
+var seedInitialAdmin = app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("SeedInitialAdmin");
+if (seedInitialAdmin)
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<CompDbContext>();
     var appliedMigrations = await dbContext.Database.GetAppliedMigrationsAsync();
     if (appliedMigrations.Any() && !await dbContext.Users.AnyAsync())
     {
+        var email = builder.Configuration["InitialAdmin:Email"] ?? "dev-admin@comp.local";
+        var password = builder.Configuration["InitialAdmin:Password"] ?? "Comp1234!";
+
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
-        var devAdmin = new AppUser { UserName = "dev-admin@comp.local", Email = "dev-admin@comp.local", EmailConfirmed = true, DisplayName = "Dev Admin" };
-        dbContext.PendingActorOverride = devAdmin.Id;
-        await userManager.CreateAsync(devAdmin, "Comp1234!");
-        dbContext.PendingActorOverride = devAdmin.Id;
-        await userManager.AddToRoleAsync(devAdmin, Roles.SuperAdmin);
+        var initialAdmin = new AppUser { UserName = email, Email = email, EmailConfirmed = true, DisplayName = "Admin" };
+        dbContext.PendingActorOverride = initialAdmin.Id;
+        await userManager.CreateAsync(initialAdmin, password);
+        dbContext.PendingActorOverride = initialAdmin.Id;
+        await userManager.AddToRoleAsync(initialAdmin, Roles.SuperAdmin);
     }
 }
 

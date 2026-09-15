@@ -1,0 +1,79 @@
+# Render Blueprint for a staging deployment: comp-api-staging (Docker web service),
+# comp-web-staging (static site), and a managed Postgres database, wired together.
+#
+# One-time setup (see docs/CLAUDE.md's Deployment section for the full walkthrough):
+#   1. Push this file to the repo, then in the Render dashboard: New -> Blueprint,
+#      point it at this repo/branch. Render reads this file and proposes all three
+#      resources below.
+#   2. It will prompt for the two `sync: false` values (InitialAdmin__Email, and
+#      anything else marked that way) -- enter them there, never commit them here.
+#   3. Everything marked `generateValue: true` is created for you as a random secret
+#      and never appears in this file or in git.
+#
+# The API's Jwt:Issuer and the web app's API base URL below are hardcoded to the
+# *.onrender.com URLs that Render deterministically assigns from the `name:` fields
+# below (https://<name>.onrender.com) -- if you rename either service in the
+# dashboard after creation, update the matching value here (and redeploy) too.
+
+databases:
+  - name: comp-staging-db
+    databaseName: comp
+    user: comp
+    plan: free
+
+services:
+  - type: web
+    name: comp-api-staging
+    runtime: docker
+    dockerfilePath: ./src/Comp.Api/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__Default
+        fromDatabase:
+          name: comp-staging-db
+          property: connectionString
+      # Nothing else can run `dotnet ef database update` against this database --
+      # applying pending migrations on every boot is a deliberate, safe no-op once
+      # the schema is already current. See Program.cs.
+      - key: RunMigrationsOnStartup
+        value: "true"
+      # Bootstraps exactly one Super Admin the first time this database has zero
+      # users. Never the fixed dev-admin@comp.local/Comp1234! convenience local dev
+      # uses -- this box is reachable from the internet, so its own credentials are
+      # required and the password is generated for you, not typed by anyone.
+      - key: SeedInitialAdmin
+        value: "true"
+      - key: InitialAdmin__Email
+        sync: false
+      - key: InitialAdmin__Password
+        generateValue: true
+      - key: Jwt__Issuer
+        value: https://comp-api-staging.onrender.com
+      - key: Jwt__Audience
+        value: comp-clients
+      - key: Jwt__SigningKey
+        generateValue: true
+      - key: Cors__AllowedOrigins
+        value: https://comp-web-staging.onrender.com
+
+  - type: web
+    name: comp-web-staging
+    runtime: static
+    buildCommand: cd clients && corepack enable && corepack prepare pnpm@12.4.1 --activate && pnpm install --frozen-lockfile && pnpm --filter web build
+    staticPublishPath: clients/web/dist
+    # React Router handles routing client-side -- without this, refreshing the browser on
+    # anything but the exact root path (e.g. /home, /competitions/x/events) 404s, since
+    # there's no actual file at that path for a plain static file server to find.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: VITE_API_BASE_URL
+        value: https://comp-api-staging.onrender.com

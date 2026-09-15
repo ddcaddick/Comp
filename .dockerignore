@@ -1,0 +1,15 @@
+# Only src/ is actually needed to build Comp.Api's image -- everything else here just
+# keeps a stray large or irrelevant directory from ever being sent to the Docker daemon
+# as part of the build context.
+**/bin/
+**/obj/
+**/.vs/
+**/node_modules/
+
+clients/
+tests/
+docs/
+tools/
+openapi/
+.git/
+.github/
