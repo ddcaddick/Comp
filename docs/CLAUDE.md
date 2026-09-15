@@ -71,9 +71,22 @@ docker compose up -d                      # database
 dotnet run --project src/Comp.Api         # API on :5200
 dotnet run --project src/Comp.Api --launch-profile lan   # reachable from a phone
 pnpm --filter web dev                     # web app on :5173
-pnpm --filter mobile start                # Expo
+pnpm --filter mobile start                # Expo — press a for an Android emulator, or scan the QR with Expo Go
 dotnet test                               # backend tests
 pnpm -r test                              # client tests
+```
+
+The Android emulator reaches the API at `http://10.0.2.2:5200` (its built-in alias for the host
+machine's localhost) — `clients/mobile/src/lib/api.ts` defaults to that. A real device on the
+same Wi-Fi instead needs `EXPO_PUBLIC_API_BASE_URL` set to the dev machine's LAN address, with
+the API started via the `lan` launch profile above.
+
+Building the Android APK (decision D11 — internal distribution, no Play Console account):
+
+```powershell
+cd clients/mobile
+npx eas login                             # one-time, needs a free Expo account
+eas build --platform android --profile internal
 ```
 
 Migrations:
@@ -339,8 +352,9 @@ submission on both platforms deferred to M10 rather than run in parallel from we
 about M1–M6's work changes; this only affects M4 and M9/M10's store-related steps. See the
 doc's changelog and D11 for the full reasoning.
 
-**Milestone M7 (live result entry) — backend is complete; the mobile entry screen itself is
-not started.** `GET /events/{id}/squads/{sid}/runner`, `PUT
+**Milestone M7 (live result entry) — backend and the mobile app are both complete; only the
+actual EAS Android build is left, which needs the user's own Expo account.** `GET
+/events/{id}/squads/{sid}/runner`, `PUT
 /events/{id}/participants/{pid}/runs/{runNumber}`, `GET /events/{id}/entry-session`,
 `POST /events/{id}/entry-session/heartbeat` (`Comp.Api/Endpoints/LiveEntryEndpoints.cs`).
 Per section K: recording runs and the heartbeat are Super Admin/Admin/Official; the runner
@@ -386,13 +400,64 @@ view and the session GET are open to any authenticated role.
   run-number-out-of-range and finalised-event conflicts, the negative-authorization case,
   and the entry-session heartbeat/read-back/unknown-event cases. 78/78 passing overall
   (66 pre-existing + 12 new).
-- Deliberately not built yet: the actual mobile entry screen (sign-in, event list, squad
-  runner UI, the custom time keypad from section J) — this pass was the backend surface
-  only. That, plus the Expo/EAS Android-APK scaffold itself (decision D11), is the
-  remaining M7 work and the natural next session.
+**The mobile app** (`clients/mobile`) is a new pnpm workspace member — Expo Router, TypeScript,
+SDK 57 — scaffolded via `create-expo-app` and then stripped back to just what section J's
+screens need (its demo tabs/components/assets, its own nested `.git`, and its bundled
+`AGENTS.md`/`CLAUDE.md` were all deleted; this repo's own `docs/CLAUDE.md` is the only one
+that applies). Screens: sign-in (`app/index.tsx`) → event list (`app/events/index.tsx`) →
+squad list (`app/events/[eventId]/index.tsx`) → squad runner
+(`app/events/[eventId]/squads/[squadId]/index.tsx`) → entry
+(`.../squads/[squadId]/entry.tsx`).
 
-Not yet built past M7's backend: the mobile client for M7, results/finalisation/standings
-persistence and endpoints (M8), output/hardening (M9).
+- **Auth mirrors the web app's pattern** (`lib/api.ts`/`lib/auth.tsx`) — same `openapi-fetch`
+  client, same login/401-refresh/retry interceptor — with one necessary difference:
+  `localStorage` is synchronous and `expo-secure-store` is not. `lib/tokenStore.ts` keeps the
+  tokens in an in-memory module variable that the interceptor reads synchronously, persists
+  every change to SecureStore, and hydrates that variable from SecureStore once at startup
+  (`AuthProvider`'s `isLoading` gates the sign-in/event-list screens until that hydration
+  finishes, avoiding a sign-in flash on a warm start).
+- **The squad runner is the entry screen's only source of truth**, exactly as the backend
+  models it: it renders whatever `GET .../runner` returns fresh, with no local idea of
+  progress. The one thing the server doesn't hand back directly is *which* run is next
+  before anything has been saved this session (`SaveRunResponse.nextOutstanding` only exists
+  after a save) — `lib/squadRunner.ts`'s `findInitialOutstanding` derives it client-side
+  (earliest run number not yet recorded by everyone, first participant in squad order still
+  missing it), unit-tested in `squadRunner.test.ts`. After every save, the server's own
+  `nextOutstanding` drives the auto-advance instead of recomputing anything.
+- **The entry screen** follows section J's design rules directly: the shooter's name is the
+  largest element; a custom keypad (reusing `@comp/core`'s already-tested `digitsToMillis`/
+  `formatMillis` rather than reimplementing time parsing a third time) fills right-to-left,
+  never the system keyboard; a penalty stepper with a `+5` chip caps at 20; DNF is a
+  separated control that confirms before clearing the time; overwriting an already-recorded
+  run confirms and shows the old value first; a save sends an `Idempotency-Key` (from
+  `expo-crypto`'s `randomUUID`, reused across a retry of the *same* body so a dropped
+  response replays safely, regenerated if the official actually changed something before
+  retrying) and gives haptic feedback (`expo-haptics`) on both success and failure.
+- **Detect-and-warn is a dismissible banner on the squad list**, not the blocking modal in
+  section G's sequence diagram — `GET .../entry-session` is shown as "Last entered by
+  {name}, Xm ago" when under 10 minutes old, and a heartbeat fires on entering the squad
+  runner screen. Simpler than the doc's confirm-to-continue dialog, and a reasonable
+  first-pass simplification for the prototyping phase; revisit if it proves too easy to miss
+  in practice.
+- Removed from the scaffold's defaults as out of scope for D11's Android-only prototyping
+  phase: `react-dom`/`react-native-web` (no web target), `react-native-reanimated`/
+  `react-native-worklets` (native-stack navigation doesn't need them), and the
+  `typedRoutes`/`reactCompiler` experiments (both still experimental in this Expo SDK;
+  not worth the friction without a concrete need).
+- `eas.json` is committed with `development`/`internal`/`production` build profiles
+  (`internal` is D11's sideloadable-APK profile), but nothing has actually been built yet —
+  that needs `npx eas login` with a free Expo account, which only the user can do. See the
+  Commands section above.
+- Verified: `pnpm --filter mobile typecheck` and `test` (5 new tests in
+  `squadRunner.test.ts`, plus `packages/core`'s and `web`'s existing suites all still green
+  — 35 tests total across the workspace), and `npx expo export --platform android` bundles
+  all 1300+ modules with Metro with no errors. Not verified: actually running the app on an
+  emulator or device — there wasn't one available in this environment. Run
+  `pnpm --filter mobile start` and open it in Expo Go or an Android emulator before trusting
+  the UI itself; only its types, logic, and bundling are confirmed so far.
+
+Not yet built past M7: results/finalisation/standings persistence and endpoints (M8),
+output/hardening (M9), the actual EAS Android build and store submission (M10, per D11).
 
 Do not build a competition-data write endpoint before deciding how it authenticates — the
 audit interceptor throws if `SaveChangesAsync` runs with no current user (and no
