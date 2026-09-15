@@ -86,8 +86,12 @@ Building the Android APK (decision D11 — internal distribution, no Play Consol
 ```powershell
 cd clients/mobile
 npx eas login                             # one-time, needs a free Expo account
-eas build --platform android --profile internal
+npx eas build --platform android --profile internal
 ```
+
+`eas-cli` is a devDependency of `clients/mobile` (not a global install) so `npx eas` always
+resolves to the pinned version — `npx eas` alone (no `-cli` suffix) is correct once it's
+installed; `npx eas-cli login` also works and is what you'd need before it was added here.
 
 Migrations:
 
