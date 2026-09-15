@@ -498,6 +498,48 @@ mocked.
   Mono throughout — without changing their layout or behaviour, since only sign-in had a
   mock to match.
 
+**The mobile app has now actually been run and signed into**, on a local Android emulator
+(installed into `%LOCALAPPDATA%\Android\Sdk` via the command-line tools — no Android Studio
+IDE needed; `android emulator create/start` and `android screen capture` made it possible to
+drive and literally see the emulator from the terminal). Two real bugs surfaced and were
+fixed:
+
+- **A network-level login failure hung on "Verifying" forever with no visible error.**
+  `openapi-fetch`'s `api.POST(...)` only resolves `{ error }` for an HTTP error *response*;
+  a failure before any response arrives (unreachable host, timeout) instead *rejects* the
+  promise. `lib/auth.tsx`'s `login()` had no `try/catch` around it, so that rejection
+  propagated straight out of the sign-in screen's un-guarded `await login(...)`, skipping
+  its `setSubmitting(false)`. Fixed by wrapping the whole request in `login()` in a
+  `try/catch` that always returns a normal `{ success: false, error }` result.
+- **Every real request — including a completely successful login — failed with `Error:
+  onResponse: must return new Response() when modifying the response`,** thrown by
+  `openapi-fetch` itself (`dist/index.cjs`'s `onResponse` handling: any truthy return is
+  treated as "replace the response with this" and must pass `instanceof Response`, or it
+  throws). `lib/api.ts`'s interceptor returned the *same* `response` object back to mean
+  "unchanged" — correct-looking, but the library's actual contract is to return void/nothing
+  for that case and only return a value when constructing a genuinely new `Response` (the
+  GET-retry-after-refresh branch is the one legitimate case, and was already doing that
+  correctly). This one was mid-diagnosis mistaken for a network/emulator connectivity
+  problem — confirmed as a code bug, not networking, by adding a temporary debug line that
+  surfaced the real thrown error text instead of the friendly message.
+- Getting to that point also needed a **development-only seed** — there was no account
+  anywhere to sign in with at all (no registration endpoint, no seed data; user creation is
+  otherwise always an authenticated Super Admin/Admin/Official action per the security
+  model). `Program.cs` now creates one Super Admin (`dev-admin@comp.local` /
+  `Comp1234!`) the first time the API starts against a **migrated** Development database
+  with zero users — gated on `IsDevelopment()` *and* `GetAppliedMigrationsAsync().Any()`,
+  the latter specifically because `Comp.Api.Tests`' `WebApplicationFactory` also runs in
+  Development and starts the host (running this seed block) against a brand-new
+  Testcontainers database *before* its own `MigrateAsync()` call — querying `Users` first
+  broke 69 of 78 tests with "relation asp_net_users does not exist" until this was added.
+  `GetAppliedMigrationsAsync()` tolerates a missing history table; a direct query does not.
+- `expo-crypto`/`expo-font`/`expo-haptics`/`expo-linear-gradient`/`expo-secure-store`'s
+  versions in `package.json` were guessed wrong when first added (copied a `~15.x`/`~14.x`
+  pattern from an unrelated package); running the app for real against Expo's own tooling
+  corrected them to the actual SDK-57-aligned `~57.0.x` versions the rest of the Expo
+  packages use. `app.json` also picked up an EAS project id and the `expo-font` config
+  plugin automatically from actually running `expo start`/`expo export`.
+
 Not yet built past M7: results/finalisation/standings persistence and endpoints (M8),
 output/hardening (M9), the actual EAS Android build and store submission (M10, per D11).
 

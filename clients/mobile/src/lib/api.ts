@@ -38,9 +38,14 @@ api.use({
     return request;
   },
   async onResponse({ request, response }) {
+    // openapi-fetch's middleware contract (dist/index.cjs's onResponse handling) treats
+    // any truthy return as "replace the response with this" and requires it to pass
+    // `instanceof Response` — returning the very same object back (rather than void)
+    // to mean "unchanged" throws "onResponse: must return new Response() when modifying
+    // the response". Only the actual retry branch below constructs a genuinely new one.
     const isAuthEndpoint = request.url.endsWith("/auth/login") || request.url.endsWith("/auth/refresh");
     if (response.status !== 401 || isAuthEndpoint) {
-      return response;
+      return;
     }
 
     refreshPromise ??= refreshAccessToken().finally(() => {
@@ -50,7 +55,7 @@ api.use({
 
     if (!refreshed) {
       router.replace("/");
-      return response;
+      return;
     }
 
     // As on web: a GET is safe to silently retry, a body-bearing request that hit the
