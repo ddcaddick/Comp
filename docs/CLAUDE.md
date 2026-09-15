@@ -222,17 +222,9 @@ Milestone M2 is complete. Delivered:
   - Moved `clients/mobile/api/api-types.ts` to the new `@comp/api-types` workspace
     package (see the OpenAPI bullet above) so `web` could depend on it without reaching
     into a sibling app's folder.
-  - **Found and partially fixed a pre-existing gap while verifying `pnpm -r test`:**
-    `clients/packages/core/src/time.ts` and its test file have been empty stubs since M0,
-    despite rule 4 ("parsing and formatting lives in `clients/packages/core/src/time.ts`
-    and nowhere else") and the testing expectations section both treating this package as
-    needing near-total, property-based-tested coverage. The empty test file was actively
-    failing `pnpm -r test` (an empty test file errors; zero test files don't, given
-    `--passWithNoTests`) — removed the empty file and added `--passWithNoTests` to
-    `core`'s test script so CI is honestly green rather than silently broken, but **the
-    actual `m:ss.cc` ⇄ milliseconds implementation and its property-based tests are still
-    unwritten.** This should be picked up as its own task before anything (the entry
-    screen prototype, results display) needs real time formatting.
+  - Moved `clients/mobile/api/api-types.ts` to the new `@comp/api-types` workspace
+    package (see the OpenAPI bullet above) so `web` could depend on it without reaching
+    into a sibling app's folder.
 
 Not yet built for M3: nothing — promotion/relegation isn't in M3's scope per the roadmap
 (the acceptance criterion only requires shooters assigned across leagues, not promoted
@@ -240,8 +232,23 @@ between competitions) and stays deferred unless asked for explicitly. There's al
 "activate" transition for a competition (Planning → Active) — the API design doesn't call
 for one, so competitions stay in `Planning` until something needs `Active` specifically.
 
-Not yet built past M3: `clients/packages/core`'s actual time parsing/formatting (see
-above), events/squads, the scoring engine, result entry, standings.
+**`clients/packages/core/src/time.ts` is now implemented** (it and its test file had been
+empty stubs since M0, silently contradicting rule 4 and the testing-expectations section —
+found while verifying `pnpm -r test` during the web shell work, above). `formatMillis`,
+`parseTime` and `digitsToMillis` cover the full round trip described in the architecture
+doc: display/entry is `m:ss.cc` (D2), and the custom keypad's right-to-left digit fill
+(section J's own example, "24256" → "2:42.56") is implemented and tested as its own
+function rather than duplicated per-client. `formatMillis` throws on invalid input (a
+programming error — it takes a value already known to be a valid time); `parseTime`
+returns `null`, never throws, since it's the boundary for untrusted text. 27 tests in
+`time.test.ts`: examples, boundaries (the 60-second and 60-minute rollovers, rounding to
+the nearest centisecond), and `fast-check` property tests (round-trip through both
+`formatMillis`/`parseTime` and `digitsToMillis`, plus a fuzzed-input safety property on
+`digitsToMillis`). `core`'s `package.json` also had its `typescript`/`vitest`
+devDependencies lost at some point (silently working off whatever `web` happened to hoist)
+and an empty `tsconfig.json` (so `tsc --noEmit` type-checked nothing) — both fixed.
+
+Not yet built past M3: events/squads, the scoring engine, result entry, standings.
 
 Do not build a competition-data write endpoint before deciding how it authenticates — the
 audit interceptor throws if `SaveChangesAsync` runs with no current user (and no
