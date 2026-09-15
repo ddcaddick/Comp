@@ -55,6 +55,9 @@ builder.Services.AddScoped<ILeagueService, LeagueService>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IEventParticipantService, EventParticipantService>();
 builder.Services.AddScoped<ISquadService, SquadService>();
+builder.Services.AddScoped<IRunnerService, RunnerService>();
+builder.Services.AddScoped<IRunService, RunService>();
+builder.Services.AddScoped<IEntrySessionService, EntrySessionService>();
 builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 
 // Access tokens are short-lived (15 minutes); the mobile app stays signed in via a
@@ -127,6 +130,7 @@ app.MapShooterEndpoints();
 app.MapCompetitionEndpoints();
 app.MapLeagueEndpoints();
 app.MapEventEndpoints();
+app.MapLiveEntryEndpoints();
 
 app.Run();
 

@@ -1271,6 +1271,217 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/events/{id}/squads/{squadId}/runner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    squadId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SquadRunnerResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{id}/participants/{participantId}/runs/{runNumber}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: {
+                    "Idempotency-Key"?: string;
+                };
+                path: {
+                    id: string;
+                    participantId: string;
+                    runNumber: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SaveRunRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SaveRunResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["HttpValidationProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{id}/entry-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EntrySessionResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{id}/entry-session/heartbeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EntrySessionResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1338,6 +1549,13 @@ export interface components {
             /** Format: int32 */
             squadNumber: null | number | string;
             name: null | string;
+        };
+        EntrySessionResponse: {
+            /** Format: uuid */
+            userId: null | string;
+            displayName: null | string;
+            /** Format: date-time */
+            lastSeenAt: null | string;
         };
         EventParticipantResponse: {
             /** Format: uuid */
@@ -1422,6 +1640,51 @@ export interface components {
         RefreshRequest: {
             refreshToken: string;
         };
+        RunnerParticipantResponse: {
+            /** Format: uuid */
+            participantId: string;
+            /** Format: uuid */
+            shooterId: string;
+            firstName: string;
+            lastName: string;
+            /** Format: int32 */
+            positionInSquad: null | number | string;
+            runs: components["schemas"]["RunnerRunState"][];
+        };
+        RunnerRunState: {
+            /** Format: int32 */
+            runNumber: number | string;
+            isRecorded: boolean;
+            /** Format: int32 */
+            rawTimeMs: null | number | string;
+            /** Format: int32 */
+            penaltyCount: number | string;
+            isDnf: boolean;
+        };
+        RunResponse: {
+            /** Format: uuid */
+            eventParticipantId: string;
+            /** Format: int32 */
+            runNumber: number | string;
+            /** Format: int32 */
+            rawTimeMs: null | number | string;
+            /** Format: int32 */
+            penaltyCount: number | string;
+            isDnf: boolean;
+            /** Format: date-time */
+            recordedAt: string;
+        };
+        SaveRunRequest: {
+            /** Format: int32 */
+            rawTimeMs: null | number | string;
+            /** Format: int32 */
+            penaltyCount: number | string;
+            isDnf: boolean;
+        };
+        SaveRunResponse: {
+            savedRun: components["schemas"]["RunResponse"];
+            nextOutstanding: null | components["schemas"]["RunnerParticipantResponse"];
+        };
         SetLeagueMembersRequest: {
             shooterIds: string[];
         };
@@ -1453,6 +1716,15 @@ export interface components {
             squadNumber: number | string;
             name: null | string;
             status: string;
+        };
+        SquadRunnerResponse: {
+            /** Format: uuid */
+            squadId: string;
+            /** Format: int32 */
+            squadNumber: number | string;
+            squadName: null | string;
+            squadStatus: string;
+            participants: components["schemas"]["RunnerParticipantResponse"][];
         };
         TokenResponse: {
             accessToken: string;
