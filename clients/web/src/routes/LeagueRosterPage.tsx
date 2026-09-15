@@ -87,8 +87,11 @@ export function LeagueRosterPage() {
         </Link>
         <span className="text-muted-foreground">
           {" "}
-          · {league ? `Tier ${league.tier}` : "League"} · {memberCount}/{MAX_MEMBERS} shooters
+          · {league ? `Tier ${league.tier}` : "League"} · {memberCount}/{MAX_MEMBERS} shooters ·{" "}
         </span>
+        <Link to={`/competitions/${competitionId}/leagues/${leagueId}/standings`} className="text-primary hover:underline">
+          Standings →
+        </Link>
       </p>
 
       <div className="mb-6 rounded-lg border border-border bg-background p-4">
