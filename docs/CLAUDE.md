@@ -9,7 +9,11 @@ Full design: `docs/architecture.md`. Read it before any structural change.
 
 - **Backend:** .NET 10, ASP.NET Core Minimal APIs, EF Core 10 + Npgsql, PostgreSQL 16
 - **Web admin:** React 19 + Vite, TanStack Query, TanStack Table, React Router, Tailwind, shadcn/ui
-- **Mobile:** Expo / React Native, TypeScript
+- **Mobile:** Expo / React Native, TypeScript. Prototyping phase targets **Android only**, as
+  a sideloadable APK via EAS Build's internal-distribution profile — no Apple/Google
+  developer account needed yet. Store submission on both platforms is still the eventual
+  goal; it's deferred to a later milestone (folded into M10), not dropped. See the
+  architecture doc's decision D11.
 - **Shared clients code:** pnpm workspace under `clients/`
 
 ## Non-negotiable rules
@@ -331,6 +335,12 @@ allows Official; all GETs are open to any authenticated role.
 
 Not yet built past M6: live result entry (M7), results/finalisation/standings persistence
 and endpoints (M8), output/hardening (M9).
+
+**Plan change (15 Sep 2026):** the architecture doc bumped to Version 4 — mobile deployment
+re-phased to an Android-only, sideloadable-APK prototyping stage (decision D11), with store
+submission on both platforms deferred to M10 rather than run in parallel from week 6. Nothing
+about M1–M6's work changes; this only affects M4 and M9/M10's store-related steps. See the
+doc's changelog and D11 for the full reasoning.
 
 Do not build a competition-data write endpoint before deciding how it authenticates — the
 audit interceptor throws if `SaveChangesAsync` runs with no current user (and no

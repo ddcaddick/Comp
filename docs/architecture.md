@@ -1,9 +1,15 @@
 # Shooting Competition Management System
-## Discovery & Architecture Brief — Version 3
+## Discovery & Architecture Brief — Version 4
 
-**Date:** 14 September 2026
+**Date:** 15 September 2026
 **Target first live season:** January 2027
-**Changes from v2:** mobile client moves from .NET MAUI to Expo (React Native). Contract
+**Changes from v3:** mobile plan re-phased — prototyping now targets a sideloadable Android
+APK (EAS Build, internal distribution) with no Apple or Google developer account, so the app
+can be tested on real devices without the store pipeline's timeline pressure. Store submission
+on both platforms is still the eventual goal; it resumes as a later milestone rather than
+running in parallel from week 6. See decision D11, section F's mobile table, section L, and
+milestone M4. Domain model, scoring rules and everything else are unchanged.
+**Changes from v2:** mobile client moved from .NET MAUI to Expo (React Native). Contract
 generation, store release pipeline, testing and roadmap revised accordingly. Domain model and
 scoring rules unchanged.
 
@@ -21,8 +27,9 @@ scoring rules unchanged.
 | D6 | **Competition** is the annual top level, holding ~5 leagues. Every event belongs to one competition and scores for all its leagues. |
 | D7 | Drop rule applies **continuously**. With `dropWorstCount = 5`, standings begin counting after event 6 and always exclude the worst five to date. |
 | D8 | Backend and web admin in **C#/.NET**. |
-| D9 | **Both** iOS and Android. |
+| D9 | **Both** iOS and Android — the eventual target; see D11 for the phased path there. |
 | D10 | Mobile client in **Expo (React Native)**. |
+| D11 | **Prototyping phase targets Android only**, distributed as a sideloadable APK built through EAS Build's free cloud tier (internal-distribution profile) — no Apple Developer Program or Google Play Console account needed, and no App/Play Store review. iOS and store submission on both platforms resume as a later milestone (folded into M10) once the app is validated on real Android devices. |
 
 ### Assumptions
 
@@ -346,14 +353,20 @@ learning curve. Decide this in week 1, not later.
 | Layer | Choice | Reasoning |
 |-------|--------|-----------|
 | Framework | **Expo (React Native), TypeScript** | Builds both stores from Windows via EAS, no Mac required. The deepest component and tooling ecosystem for exactly this kind of screen. |
-| Build & submit | **EAS Build + EAS Submit** | Cloud builds and store submission without owning Apple hardware. |
-| Updates | **EAS Update** | Over-the-air JavaScript updates. A keypad fix reaches officials in minutes rather than through store review. This is the single biggest practical gain from the switch, and it matters most in the first season. |
+| Build | **EAS Build, internal distribution** (D11) | A sideloadable Android APK straight from the cloud build — no Play Console, no Apple Developer Program, no store review. `EAS Submit` and an iOS build are added back once store submission resumes (M10); nothing about the app itself needs to change to add them later. |
+| Updates | **EAS Update** | Over-the-air JavaScript updates. A keypad fix reaches officials in minutes rather than through store review. This is the single biggest practical gain from the switch, and it matters most in the first season — and needs no store account either. |
 | Navigation | Expo Router | File-based, minimal configuration. |
 | Data | TanStack Query | Caching, retries, request deduplication, mutation state. Its retry behaviour is most of what the entry screen needs for flaky signal. |
 | Types | Generated from the API's OpenAPI document | See section G. |
 | Styling | React Native `StyleSheet` | Six screens. Skip the styling framework. |
 | Secure storage | `expo-secure-store` | Refresh tokens in the Keychain and Keystore, not AsyncStorage. |
 | Errors | Sentry React Native SDK | |
+
+**Why this changes nothing else.** EAS Build produces the same compiled app either way; an
+internal-distribution APK and a Play/TestFlight submission are two different EAS profiles
+against the same project, not two different apps. Nothing in the Expo/React Native choice,
+the navigation, data, or update strategy above depends on which distribution path is active,
+so deferring store submission costs nothing to undo later.
 
 ### What the split costs, honestly
 
@@ -756,7 +769,7 @@ anonymisation of the shooter record while preserving the results referencing it.
 | Environment | Purpose | Data |
 |-------------|---------|------|
 | Local | Development | Postgres in Docker, seeded fixtures |
-| Staging | Pre-release; TestFlight and Play closed-track builds point here | Anonymised copy |
+| Staging | Pre-release; the Android APK points here for now, TestFlight/Play closed-track builds once store submission resumes | Anonymised copy |
 | Production | Live | Real |
 
 ### Hosting
@@ -772,13 +785,20 @@ anonymisation of the shooter record while preserving the results referencing it.
 | Uptime check | UptimeRobot or Better Stack | Free |
 | **Running total** | | **roughly £5–25 per month** |
 
-One-offs: Apple Developer Program ~£79/year, Google Play ~£20 once. Open the Apple account this
-month; approval takes time and can hold a release.
+One-offs, once store submission resumes (D11 — not needed for the Android APK prototyping
+phase): Apple Developer Program ~£79/year, Google Play ~£20 once. Open both accounts as soon
+as that milestone is scheduled; approval takes time and can hold a release.
 
 A .NET container needs more memory than a Node one. Budget 512MB, set `DOTNET_gcServer=0` on a
 small instance, and publish trimmed and ReadyToRun so start-up is quick after an idle restart.
 
 ### The Google Play gate
+
+**Paused for now (D11).** This section describes a constraint on *store* submission, which
+isn't happening during the Android-APK prototyping phase — the internal-distribution APK
+needs no Play Console account at all, so none of this applies yet. Revisit it when store
+submission is scheduled (folded into M10), and start whichever path below is chosen with
+enough lead time before that milestone's target date.
 
 Personal Play Console accounts created after 13 November 2023 must run a closed test with at least
 12 testers opted in continuously for 14 days before they can apply for production access, and
@@ -787,14 +807,15 @@ D-U-N-S number are exempt.
 
 Two ways through:
 
-- **If the club is a registered legal entity**, apply for a D-U-N-S number now. It is free, skips
+- **If the club is a registered legal entity**, apply for a D-U-N-S number. It is free, skips
   the gate entirely, and also unlocks Apple organisation enrolment so the app carries the club's
-  name. It can take several weeks to issue, so it is a September job or not at all.
+  name. It can take several weeks to issue.
 - **Otherwise**, recruit 12 club members as testers. You are better placed than most solo
   developers here; most people cannot find 12 Android users who will engage for a fortnight, and
   you have 120 to ask.
 
-Either way this is a scheduling constraint, not a technical one, and it is handled in M4 below.
+Either way this is a scheduling constraint, not a technical one, and it is handled when store
+submission is actually scheduled, not before.
 
 ### Operations
 
@@ -804,9 +825,9 @@ Either way this is a scheduling constraint, not a technical one, and it is handl
   generation with a drift check, mobile typecheck and tests. On merge: deploy API to staging,
   publish the WASM bundle. Production deploy is a manual trigger — deploying on a Wednesday
   evening mid-event is a habit worth never forming.
-- **Mobile releases:** EAS Build on demand. JavaScript-only changes ship through EAS Update; a
-  native module change needs a new store build. Keep native dependencies stable once the season
-  starts.
+- **Mobile releases:** EAS Build on demand — a fresh APK for now, a store build once submission
+  resumes. JavaScript-only changes ship through EAS Update either way; a native module change
+  needs a new build. Keep native dependencies stable once the season starts.
 - **Migrations:** EF Core, forward-only, applied on deploy, reviewed before merge. Prefer additive
   changes so a rollback never needs a down migration during a live event.
 - **Backups:** provider automated daily plus point-in-time recovery, and a weekly `pg_dump` to
@@ -847,13 +868,16 @@ doing anything; a renamed DTO field breaks the mobile build.
 Shooter CRUD and trigram search. Competition, leagues, memberships. Web admin shell.
 **Acceptance:** 120 shooters loaded and assigned across five leagues of the 2027 competition.
 
-### M4 — Store pipeline (week 6, running in parallel)
-**This is the milestone people skip and regret.** First real EAS build submitted to TestFlight and
-to the Play closed track, containing nothing more than sign-in and an event list. Recruit 12 club
-members onto the closed track and ask them to open it every few days. Meanwhile keep shipping
-updates to the same track.
-**Acceptance:** the app installs from TestFlight and from the Play closed-track link on real
-devices, and the 14-day tester clock is running by the end of October.
+### M4 — Android APK for device testing (week 6, running in parallel)
+Re-phased per D11: build a sideloadable Android APK via EAS Build's internal-distribution
+profile — containing nothing more than sign-in and an event list — and install it directly on
+at least one real Android device. No Play Console or Apple Developer account is involved; no
+store review; no 12-tester clock. Keep shipping updated APKs to whoever's testing it as the
+app grows through M7. Store submission on both platforms (the original scope of this
+milestone) is deferred to M10, where the Google Play gate section under deployment
+architecture applies once it's actually scheduled.
+**Acceptance:** the APK installs and runs from a direct download link on a real Android
+device, with no store account anywhere in the loop.
 
 ### M5 — Scoring engine (week 7)
 `Comp.Scoring` written test-first against the M0 specification. Property-based tests plus golden
@@ -880,12 +904,15 @@ standings with running total, counting total, dropped results and the provisiona
 
 ### M9 — Output and hardening (week 14)
 Print stylesheets, CSV export, rate limiting, error handling pass, backup restore test, seed the
-real 2027 competition. Apply for Play production access.
+real 2027 competition. If store submission has been scheduled by this point, apply for Play
+production access now — otherwise this item waits for M10, per D11.
 **Acceptance:** a results sheet and a standings table print cleanly from a browser.
 
 ### M10 — Pilot (week 15 and December)
-Store release on both platforms. Run two or three real events in parallel with paper before
-cutting over.
+Store release on both platforms, once scheduled (D11) — open the Apple/Google developer
+accounts and start the Google Play gate's 12-tester clock (or D-U-N-S application) with enough
+lead time before this milestone's target date; see section L. Run two or three real events in
+parallel with paper before cutting over.
 **Acceptance:** an official runs a real event on the app with paper as backup, and the two agree.
 
 ### MVP boundary
@@ -922,8 +949,8 @@ discovered in November, after ten months of events, is the worst outcome availab
 |------|--------|------------|------------|
 | **Entry is slower than paper** | Officials reject the app; the project fails despite being technically correct | Medium | Week-2 prototype with a real official and a stopwatch. Nothing else is built until it beats paper. |
 | **Timeline: solo, 15 weeks, two client apps** | Missing January | Medium-high | Roadmap already trimmed. If it slips, ship web plus mobile entry and run standings in a spreadsheet for a few weeks rather than cutting the audit trail or the scoring tests. |
-| **Google Play 12-tester gate** | App cannot reach production in time | Medium | M4 in week 6, well ahead of feature completeness. D-U-N-S organisation account removes it entirely if the club qualifies. |
-| **Apple enrolment or review delay** | Not installable for event 1 | Medium | Account opened in September, TestFlight in week 6, store release in week 15. |
+| **Google Play 12-tester gate** | App cannot reach production in time, once store submission is scheduled | Low for now, by design (D11) | Deferred along with store submission itself — the Android APK needs no Play account at all. Start the 12-tester clock (or the D-U-N-S application, which removes the gate entirely if the club qualifies) as soon as a store-release date is set, with enough lead time before it. |
+| **Apple enrolment or review delay** | Not installable via the App Store, once store submission is scheduled | Low for now, by design (D11) | Deferred along with store submission — the Android APK prototyping phase needs no Apple account. Open the account and start TestFlight as soon as a store-release date is set. |
 | **Contract drift between C# and TypeScript** | Runtime failures at the range | Medium | Types generated from OpenAPI with a CI drift check. A mismatch is a compile error, not a Wednesday evening surprise. |
 | **Two-language overhead** | Slower progress, context switching | Medium | Keep the mobile app to four screens. Anything administrative belongs on the web. |
 | **Scoring rule misunderstood** | Ten months of wrong league tables | Low now D1–D7 are settled | Golden fixtures from a real past event; first three events run in parallel with paper. |
@@ -938,8 +965,9 @@ discovered in November, after ten months of events, is the worst outcome availab
 
 ## Immediate next steps
 
-1. Open the Apple Developer account and the Google Play account this week. If the club is a
-   registered legal entity, start the D-U-N-S application at the same time.
+1. ~~Open the Apple Developer account and the Google Play account this week.~~ Deferred per
+   D11 — not needed until store submission is scheduled (M10). Revisit the D-U-N-S question
+   then too, if the club is a registered legal entity.
 2. Send a real scoresheet from a past event, with the league table it produced, to serve as the
    golden fixture.
 3. Decide Blazor or React for the web admin app (week 1).
