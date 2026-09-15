@@ -555,18 +555,47 @@ config changes needed): created a competition, created an event under it, and wa
 event immediately show up in the mobile app's own event list.
 
 **Decision (15 Sep 2026):** per explicit user direction, squad and participant management
-(add a participant to an event, build/edit squads, move shooters between squads) will be
-built on **mobile**, not web — Officials are already permitted to do this per the security
-model (section K), and the architecture doc's M6 milestone already describes it as
-night-of-event work, it just hasn't been built on either client yet. Creating a competition
-or event itself stays web-only, Super Admin/Admin, per the security model — that is not a
-client-side choice, the backend rejects it for any other role regardless of which app asks.
-This is a deliberate, narrow extension of section J's "mobile stays small" boundary, not a
-reversal of it. **Not yet built**: the mobile squad/participant screens themselves — next up.
+(add a participant to an event, build/edit squads, move shooters between squads) is built on
+**mobile**, not web — Officials are already permitted to do this per the security model
+(section K), and the architecture doc's M6 milestone already describes it as night-of-event
+work. Creating a competition or event itself stays web-only, Super Admin/Admin, per the
+security model — that is not a client-side choice, the backend rejects it for any other role
+regardless of which app asks. This is a deliberate, narrow extension of section J's "mobile
+stays small" boundary, not a reversal of it.
 
-Not yet built past M7: mobile squad/participant management (above), results/finalisation/
-standings persistence and endpoints (M8), output/hardening (M9), the actual EAS Android
-build and store submission (M10, per D11).
+**Mobile squad/participant management is built**, on the squad list screen
+(`app/events/[eventId]/index.tsx`) plus a new `app/events/[eventId]/add-participant.tsx`:
+
+- **"+ Squad"** creates one with no dialog (`POST .../squads` with `squadNumber: null`,
+  matching the backend's own auto-numbering default) — deliberately zero-friction, since
+  naming a squad is optional and the common case at the range is "just give me another
+  squad".
+- **"+ Shooter"** opens a search screen (`GET /shooters?q=...&active=true`, matching
+  `docs/m2-wiring.md`'s note that this specific participant-selection workflow should
+  default to active-only unlike the general shooter search) with a "Can't find them? Add a
+  new shooter" fallback that creates the shooter (`POST /shooters`) and adds them to the
+  event (`POST .../participants`) in one action. Newly added participants start
+  unassigned (`squadId: null`) — matching the same shape `AddParticipantRequest` already
+  requires.
+- **Unassigned participants** get their own section on the squad list, each with a row of
+  squad chips to tap-assign (`PATCH .../participants/{pid}`) — the simplest possible
+  interaction for what's normally a handful of squads. Moving an already-assigned
+  participant to a *different* squad, or removing one, isn't built yet (not blocking; flag
+  if it's needed).
+- Verified on the Android emulator, screenshotted end to end: created a shooter inline,
+  watched her appear under "Unassigned", tapped the squad chip to assign her, and confirmed
+  the squad runner screen immediately showed her as "Next up · Run 1" — the same screen
+  M7's entry flow already exercises.
+- Fixed one real, unrelated-to-the-story bug hit while testing this: the search input's
+  `autoFocus` was suspected of stealing focus from the name fields below it and was
+  removed, but the actual cause turned out to be nothing in the app at all — every "tap
+  landed in the wrong field" was this session's own test coordinates not being scaled from
+  the screenshot's display size to the emulator's actual pixel size. `autoFocus` stayed
+  removed anyway (harmless, arguably better UX not to pop the keyboard immediately), but
+  nothing was actually broken here.
+
+Not yet built past M7: results/finalisation/standings persistence and endpoints (M8),
+output/hardening (M9), the actual EAS Android build and store submission (M10, per D11).
 
 Do not build a competition-data write endpoint before deciding how it authenticates — the
 audit interceptor throws if `SaveChangesAsync` runs with no current user (and no
