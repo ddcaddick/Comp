@@ -1016,6 +1016,17 @@ running at the time), but the change is small, typed, and follows the exact patt
 used elsewhere on this page (`CompetitionsPage`/`EventsPage`/`LeaguesPage` all already query
 `/competitions` the same way).
 
+**`AppShell`'s top nav is now responsive.** It was built with no small-screen handling at all —
+a single non-wrapping flex row, so the nav links and "Sign out" simply got clipped off the edge
+of the viewport on a tablet or phone browser (this admin app had only ever been used on desktop
+before). Below Tailwind's `md` breakpoint, the logo/wordmark and a hamburger button are all that
+show in the header; tapping it opens a stacked panel (nav links, then the user's name and Sign
+out) below the header. Desktop layout is unchanged — the existing horizontal nav and user/sign-out
+row just gained `hidden md:flex`, and the hamburger button is `md:hidden`. Verified on the Android
+emulator's Chrome (a real phone-width viewport, not a resized desktop window): logged in via
+`adb input`, confirmed the header shows nothing clipped, and the opened menu shows all three nav
+links, "Dev Admin", and "Sign out" fully visible.
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 
