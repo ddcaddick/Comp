@@ -13,6 +13,7 @@
   "dependencies": {
     "@comp/api-types": "workspace:*",
     "@comp/core": "workspace:*",
+    "@react-pdf/renderer": "^4.9.0",
     "@tanstack/react-query": "^5.102.8",
     "@tanstack/react-table": "^8.9.9",
     "class-variance-authority": "^0.7.1",
