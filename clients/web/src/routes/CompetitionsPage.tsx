@@ -123,9 +123,14 @@ export function CompetitionsPage() {
                 </td>
                 <td className="py-2 pr-4">{competition.status}</td>
                 <td className="py-2 pr-4">
-                  <Link to={`/competitions/${competition.id}/events`} className="text-primary hover:underline">
-                    Events →
-                  </Link>
+                  <div className="flex gap-3">
+                    <Link to={`/competitions/${competition.id}/events`} className="text-primary hover:underline">
+                      Events →
+                    </Link>
+                    <Link to={`/competitions/${competition.id}/leagues`} className="text-primary hover:underline">
+                      Leagues →
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}

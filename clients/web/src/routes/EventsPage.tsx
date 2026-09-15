@@ -4,6 +4,7 @@ import { useParams } from "react-router";
 import { api } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { CompetitionTabs } from "../components/layout/CompetitionTabs";
 
 // Matches Comp.Domain.Enums.EventStatus — Finalised isn't reachable yet (that's M8).
 const STATUS_SEQUENCE = ["Draft", "Setup", "InProgress", "Review"];
@@ -88,7 +89,7 @@ export function EventsPage() {
   return (
     <div>
       <h1 className="mb-1 text-lg font-semibold">{competition ? competition.name : "Events"}</h1>
-      <p className="mb-4 text-sm text-muted-foreground">Events</p>
+      <CompetitionTabs competitionId={competitionId!} />
 
       <form
         onSubmit={handleSubmit}
