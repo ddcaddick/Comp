@@ -6,6 +6,7 @@ using Comp.Application.Abstractions;
 using Comp.Application.Validation;
 using Comp.Infrastructure;
 using Comp.Infrastructure.Competitions;
+using Comp.Infrastructure.Events;
 using Comp.Infrastructure.Identity;
 using Comp.Infrastructure.Leagues;
 using Comp.Infrastructure.Shooters;
@@ -51,6 +52,9 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IShooterService, ShooterService>();
 builder.Services.AddScoped<ICompetitionService, CompetitionService>();
 builder.Services.AddScoped<ILeagueService, LeagueService>();
+builder.Services.AddScoped<IEventService, EventService>();
+builder.Services.AddScoped<IEventParticipantService, EventParticipantService>();
+builder.Services.AddScoped<ISquadService, SquadService>();
 builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 
 // Access tokens are short-lived (15 minutes); the mobile app stays signed in via a
@@ -122,6 +126,7 @@ app.MapAuthEndpoints();
 app.MapShooterEndpoints();
 app.MapCompetitionEndpoints();
 app.MapLeagueEndpoints();
+app.MapEventEndpoints();
 
 app.Run();
 

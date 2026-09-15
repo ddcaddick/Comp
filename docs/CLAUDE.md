@@ -293,8 +293,44 @@ doc's section I exactly, with one necessary extension:
   `EventResult` rows, or any endpoint calling this library at all — that's M8 (results,
   finalisation, standings), which needs events and runs to exist first (M6, M7).
 
-Not yet built past M5: events/squads (M6), live result entry (M7), results/finalisation/
-standings persistence and endpoints (M8), output/hardening (M9).
+**Milestone M6 (events, participants, squads) is complete.** `GET/POST /events`,
+`PATCH /events/{id}`, `POST /events/{id}/transition`; `GET/POST /events/{id}/participants`,
+`PATCH`/`DELETE .../participants/{pid}`; `GET/POST /events/{id}/squads`. Per section K:
+creating/editing events is Super Admin/Admin only; managing participants and squads also
+allows Official; all GETs are open to any authenticated role.
+
+- **Transition is deliberately narrower than the full doc-described lifecycle**: it only
+  moves one step at a time along Draft ↔ Setup ↔ InProgress ↔ Review (either direction,
+  e.g. to undo an accidental advance), and refuses a "to" of Finalised outright —
+  finalising needs the scoring engine wired in to actually compute and freeze results,
+  which is M8. A finalised event (there's no way to reach one through the API yet;
+  tests set it directly via the DbContext to prove the lock itself) refuses every write
+  this milestone adds — participants, squads, and further transitions alike.
+- **Adding a participant snapshots their current league membership** into
+  `EventParticipant.LeagueId` at that moment, via a lookup at add time, never a live join
+  — exactly the snapshot the architecture doc's section D calls for, so a later membership
+  correction can't rewrite an earlier night's division tables. Requires the shooter to be
+  active and not already entered in the event.
+- **Moving a participant between squads** (`PATCH .../participants/{pid}`) is a full
+  replace of the squad assignment, not a partial patch: omitting `squadId` unassigns them;
+  giving a `squadId` with no position appends them to the end of it; an explicit position
+  is set as-is, with **no renumbering of anyone else** — matching `docs/m2-wiring.md`'s
+  "what is deliberately absent" (a duplicated position is a display-order glitch, not a
+  corrupted result, so it doesn't justify the complexity of shifting other rows).
+- **Removing a participant** is a real delete (not a soft one) — checked first against
+  whether any `Run` rows already reference them (the FK is `Restrict`, so the database
+  would refuse it anyway; this just gives a clear 409 instead of a raw constraint-violation
+  500). A participant with no runs recorded yet carries no history worth protecting.
+- Tested end-to-end in `tests/Comp.Api.Tests/EventEndpointTests.cs` and
+  `EventParticipantAndSquadEndpointTests.cs` (22 tests): the transition state machine,
+  the league snapshot, auto-appended vs. explicit squad positions, the finalised-event
+  lock across every M6 write, and the negative-authorization cases. 66/66 passing overall.
+- Deliberately not built in M6: `GET /events/{id}/squads/{sid}/runner` (the entry screen's
+  source of truth) and the runs `PUT` endpoint — those are M7 (live result entry), which
+  this milestone's schema and services are already shaped to support.
+
+Not yet built past M6: live result entry (M7), results/finalisation/standings persistence
+and endpoints (M8), output/hardening (M9).
 
 Do not build a competition-data write endpoint before deciding how it authenticates — the
 audit interceptor throws if `SaveChangesAsync` runs with no current user (and no
