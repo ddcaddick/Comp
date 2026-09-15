@@ -124,6 +124,7 @@ public class ResultsService(CompDbContext dbContext) : IResultsService
             s.ShooterId,
             shooters[s.ShooterId].FirstName,
             shooters[s.ShooterId].LastName,
+            shooters[s.ShooterId].Nickname,
             s.Position,
             s.RunningTotal,
             s.CountingTotal,
@@ -140,10 +141,10 @@ public class ResultsService(CompDbContext dbContext) : IResultsService
 
         return scored.Participants.Select(score =>
         {
-            var (shooterId, firstName, lastName) = context.ParticipantInfo[score.ParticipantId];
+            var (shooterId, firstName, lastName, nickname) = context.ParticipantInfo[score.ParticipantId];
             var leagueName = score.LeagueId is { } leagueId ? context.LeagueNames.GetValueOrDefault(leagueId) : null;
             return new EventParticipantResultResponse(
-                score.ParticipantId, shooterId, firstName, lastName, score.LeagueId, leagueName,
+                score.ParticipantId, shooterId, firstName, lastName, nickname, score.LeagueId, leagueName,
                 score.Status.ToString(), score.EventTimeMs, score.BestRunNumber,
                 score.OverallPosition, score.LeaguePosition, score.LeaguePoints);
         }).ToList();
@@ -174,7 +175,7 @@ public class ResultsService(CompDbContext dbContext) : IResultsService
             var leagueName = r.LeagueId is { } leagueId ? leagueNames.GetValueOrDefault(leagueId) : null;
             var bestRunNumber = r.BestRunId is { } runId ? runNumbersById.GetValueOrDefault(runId) : (int?)null;
             return new EventParticipantResultResponse(
-                r.EventParticipantId, participant.ShooterId, shooter.FirstName, shooter.LastName,
+                r.EventParticipantId, participant.ShooterId, shooter.FirstName, shooter.LastName, shooter.Nickname,
                 r.LeagueId, leagueName, r.Status.ToString(), r.EventTimeMs, bestRunNumber,
                 r.OverallPosition, r.LeaguePosition, r.LeaguePoints);
         }).ToList();
@@ -208,7 +209,7 @@ public class ResultsService(CompDbContext dbContext) : IResultsService
             l => l.Id,
             l => new LeagueRules(l.PointsForFirst, l.PointsDecrement, l.DropWorstCount, l.AbsencesCountAsZero));
 
-        var participantInfo = participants.ToDictionary(x => x.p.Id, x => (x.s.Id, x.s.FirstName, x.s.LastName));
+        var participantInfo = participants.ToDictionary(x => x.p.Id, x => (x.s.Id, x.s.FirstName, x.s.LastName, x.s.Nickname));
         var leagueNames = leagues.ToDictionary(l => l.Id, l => l.Name);
 
         return new ScoringContext(participantInputs, leagueRules, runsByParticipant, participantInfo, leagueNames);
@@ -224,6 +225,6 @@ public class ResultsService(CompDbContext dbContext) : IResultsService
         IReadOnlyList<ParticipantInput> Participants,
         IReadOnlyDictionary<Guid, LeagueRules> LeagueRules,
         IReadOnlyDictionary<Guid, List<Run>> RunsByParticipant,
-        IReadOnlyDictionary<Guid, (Guid ShooterId, string FirstName, string LastName)> ParticipantInfo,
+        IReadOnlyDictionary<Guid, (Guid ShooterId, string FirstName, string LastName, string? Nickname)> ParticipantInfo,
         IReadOnlyDictionary<Guid, string> LeagueNames);
 }

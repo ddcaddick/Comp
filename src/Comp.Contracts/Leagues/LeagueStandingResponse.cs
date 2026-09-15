@@ -9,6 +9,7 @@ public record LeagueStandingResponse(
     Guid ShooterId,
     string FirstName,
     string LastName,
+    string? Nickname,
     int Position,
     int RunningTotal,
     int CountingTotal,

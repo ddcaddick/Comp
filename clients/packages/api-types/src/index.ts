@@ -1801,6 +1801,7 @@ export interface components {
             shooterId: string;
             firstName: string;
             lastName: string;
+            nickname: null | string;
             /** Format: uuid */
             leagueId: null | string;
             leagueName: null | string;
@@ -1882,6 +1883,7 @@ export interface components {
             shooterId: string;
             firstName: string;
             lastName: string;
+            nickname: null | string;
             /** Format: int32 */
             position: number | string;
             /** Format: int32 */
