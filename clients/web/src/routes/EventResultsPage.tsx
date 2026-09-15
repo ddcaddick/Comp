@@ -23,6 +23,16 @@ export function EventResultsPage() {
   });
   const event = eventsQuery.data?.find((e) => e.id === eventId);
 
+  const competitionsQuery = useQuery({
+    queryKey: ["competitions"],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/competitions");
+      if (error) throw new Error("Failed to load competitions");
+      return data;
+    },
+  });
+  const competition = competitionsQuery.data?.find((c) => c.id === competitionId);
+
   const leaguesQuery = useQuery({
     queryKey: ["leagues", competitionId],
     queryFn: async () => {
@@ -62,10 +72,11 @@ export function EventResultsPage() {
 
   const [downloading, setDownloading] = useState(false);
   async function handleDownloadPdf() {
-    if (!overallResultsQuery.data || !event) return;
+    if (!overallResultsQuery.data || !event || !competition) return;
     setDownloading(true);
     try {
       await downloadResultsPdf({
+        competitionName: competition.name,
         eventName: event.name,
         eventDate: event.eventDate,
         isFinal: overallResultsQuery.data.isFinal,
@@ -83,7 +94,7 @@ export function EventResultsPage() {
         <Button
           variant="outline"
           size="sm"
-          disabled={downloading || !overallResultsQuery.data || !event}
+          disabled={downloading || !overallResultsQuery.data || !event || !competition}
           onClick={handleDownloadPdf}
         >
           {downloading ? "Generating…" : "Download PDF"}

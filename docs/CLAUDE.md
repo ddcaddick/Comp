@@ -1002,6 +1002,20 @@ editable.**
   no single well-defined meaning — per explicit user direction, that's out of scope for now
   and stays on the existing per-league Roster page.
 
+**The results PDF and its filename now lead with the competition name, not just the event
+name.** The header previously showed only `{eventName} — Results` with no competition name
+anywhere, ambiguous once more than one competition has a "Week 1" (as this project's own
+staging demo data does). `EventResultsPage` now also queries `/competitions` and looks up the
+current one; `resultsPdf.tsx`'s `ResultsPdfDocument`/`downloadResultsPdf` both take a
+`competitionName` prop, rendered as the main title line (`styles.title`) with the event name
+underneath it in a new smaller, accent-colored `styles.eventHeading` line. The downloaded
+filename is now `{competition}-{event}-results.pdf` (slugified) instead of just
+`{event}-results.pdf`, for the same disambiguation reason. Verified via `pnpm --filter web
+typecheck`/`test`/`build`; not re-verified visually on-device this round (no local API server
+running at the time), but the change is small, typed, and follows the exact pattern already
+used elsewhere on this page (`CompetitionsPage`/`EventsPage`/`LeaguesPage` all already query
+`/competitions` the same way).
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 
