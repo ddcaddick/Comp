@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { AppShell } from "./components/layout/AppShell";
 import { LoginPage } from "./routes/LoginPage";
+import { HomePage } from "./routes/HomePage";
 import { ShootersPage } from "./routes/ShootersPage";
 import { CompetitionsPage } from "./routes/CompetitionsPage";
 import { EventsPage } from "./routes/EventsPage";
@@ -34,7 +35,8 @@ export function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedLayout />}>
-              <Route path="/" element={<Navigate to="/shooters" replace />} />
+              <Route path="/" element={<Navigate to="/home" replace />} />
+              <Route path="/home" element={<HomePage />} />
               <Route path="/shooters" element={<ShootersPage />} />
               <Route path="/competitions" element={<CompetitionsPage />} />
               <Route path="/competitions/:competitionId/events" element={<EventsPage />} />
