@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap");
 @import "tailwindcss";
 
 /*
@@ -5,6 +6,12 @@
  * utility generation via @theme), not the full shadcn CLI-managed palette — enough for the
  * components in src/components/ui. Running `npx shadcn add <component>` later will expect
  * this same variable naming.
+ *
+ * Palette matches clients/mobile/src/lib/theme.ts (the ShooterRSG design applied there) —
+ * dark ground, orange accent, Archivo/JetBrains Mono — so the two clients read as the same
+ * product. --background is the raised-panel/header/card tone; --muted is the darker page
+ * canvas underneath it (this codebase's existing convention, e.g. AppShell's root
+ * `bg-muted` for the page and its `bg-background` header — kept rather than inverted).
  */
 @theme inline {
   --color-background: var(--background);
@@ -19,23 +26,25 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --radius-md: var(--radius);
+  --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
+  --background: #141519;
+  --foreground: #eef1f4;
+  --primary: #ff8a3d;
+  --primary-foreground: #1a1204;
+  --muted: #0b0c0f;
+  --muted-foreground: #8b929c;
+  --border: rgba(255, 255, 255, 0.13);
+  --input: #0f1116;
+  --ring: #ff8a3d;
+  --destructive: #ff9c9c;
+  --destructive-foreground: #fff5f5;
   --radius: 0.5rem;
 }
 
 body {
-  @apply bg-background text-foreground;
+  @apply bg-muted text-foreground font-sans;
 }

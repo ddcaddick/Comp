@@ -90,7 +90,10 @@ export function EventsPage() {
       <h1 className="mb-1 text-lg font-semibold">{competition ? competition.name : "Events"}</h1>
       <p className="mb-4 text-sm text-muted-foreground">Events</p>
 
-      <form onSubmit={handleSubmit} className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border border-border p-4">
+      <form
+        onSubmit={handleSubmit}
+        className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-background p-4"
+      >
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-muted-foreground" htmlFor="event-number">
             Event #

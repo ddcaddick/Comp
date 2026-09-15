@@ -594,6 +594,40 @@ stays small" boundary, not a reversal of it.
   removed anyway (harmless, arguably better UX not to pop the keyboard immediately), but
   nothing was actually broken here.
 
+**Web admin now shares the mobile app's ShooterRSG design** (per explicit user request) —
+same palette, same fonts, same brand mark, so the two clients read as one product rather than
+an admin tool that happens to talk to the same API.
+
+- `index.css`'s CSS variables (the app's "minimal slice of shadcn/ui theming", `--background`/
+  `--primary`/`--muted`/etc. feeding Tailwind's `@theme inline`) now hold the same hex values
+  as `clients/mobile/src/lib/theme.ts`, plus a Google Fonts `@import` for Archivo and
+  JetBrains Mono wired into `--font-sans`/`--font-mono`. Because `Button`/`Input`/every page
+  already used semantic classes (`bg-background`, `text-muted-foreground`, `border-border`,
+  never a raw color), this one file re-themes the whole app — no page had to change to
+  pick up the new palette.
+- This codebase's existing convention (not shadcn's default) is `--muted` for the page
+  canvas and `--background` for a raised panel/header/card — kept rather than inverted, so
+  `--muted: #0b0c0f` (mobile's `background`) and `--background: #141519` (mobile's
+  `surface`). A new `--input: #0f1116` (mobile's `inputBg`) gives form fields their own
+  darker fill, distinct from the cards they sit in — `Input` now uses `bg-input`, and both
+  `Input` and the `Button` outline variant were moved from `border-input` to `border-border`
+  so the border isn't the same color as the fill it's drawn on.
+- Fixed a real dark-theme regression the token swap would otherwise have caused: the
+  `outline`/`ghost` button variants' `hover:bg-muted` would have *darkened* a button that
+  already sits on the lighter `background` surface (since `muted` is now the darker canvas,
+  not a light hover tint) — changed to `hover:bg-white/5`, a translucent overlay that
+  lightens regardless of the surface underneath.
+- `AppShell` and `LoginPage` both gained the SR badge + "SHOOTER**RSG**" wordmark (an
+  "Admin"/"Admin console" mono tag distinguishes this from the mobile app's own mark rather
+  than pretending to be the same screen). Active nav link uses the accent color, matching
+  mobile's convention for the selected/current state. `CompetitionsPage`/`EventsPage`'s
+  form containers gained `bg-background` so they read as raised cards against the canvas,
+  matching mobile's card treatment for equivalent content.
+- Verified: full `pnpm -r typecheck`/`test` (35 tests, all green), a production
+  `vite build`, and a live look on the Android emulator's Chrome (via `adb reverse`) —
+  sign-in, the shooter register, and Competitions all screenshotted against the real API
+  and real data (the "Test Competition"/"Ada Lovelace" records from earlier testing).
+
 Not yet built past M7: results/finalisation/standings persistence and endpoints (M8),
 output/hardening (M9), the actual EAS Android build and store submission (M10, per D11).
 
