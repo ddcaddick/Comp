@@ -1038,6 +1038,29 @@ identical on screen but silently fail to authenticate from the APK while the sam
 fine on web. Fixed by trimming the password too, both in the empty-field guard and at the actual
 `login()` call.
 
+**The Leagues page gained a "Download PDF" button** covering every league's current standings in
+one document, matching the existing per-event results PDF's styling and pattern. The shared parts
+of that styling (`colors`, `page`/`title`/`tile`/`row`/`cell`/`footer`/... styles) were pulled out
+of `resultsPdf.tsx` into a new `lib/pdfTheme.ts` first, so the two generated PDFs can't drift apart
+visually — `resultsPdf.tsx` now only keeps the layout unique to it (the overall-table-left /
+league-tiles-right split).
+
+- `lib/standingsPdf.tsx`'s `downloadStandingsPdf({ competitionName, leagues })` renders one tile
+  per league (Pos/Shooter/Count/Drop/Total, nickname-preferred names via the same `preferredName`
+  helper the results PDF uses) in a single wrapping grid — there's no "overall" table here, since
+  standings have no cross-league ranking to show. Per explicit user direction, the header is just
+  two lines: the competition name, then "As of {today's date}" underneath in the accent color
+  (`todayIso()`, the same local-calendar-date helper the web/mobile Home screens already use) —
+  deliberately not a per-event date, since this always reflects the *current* standings across
+  however many events have been finalised so far.
+- `LeaguesPage` fetches every league's standings via `useQueries` (one `GET /leagues/{id}/standings`
+  per row already listed by the page's own `leaguesQuery`) rather than a new bulk endpoint — this
+  competition's own league list is already loaded and rarely more than a handful of rows. The
+  button is disabled until every one of those queries has actually resolved.
+- Verified on the Android emulator's Chrome against real finalised-event demo data: downloaded and
+  opened the PDF for Mini Rifle (3 divisions), confirmed the header, per-league tiles, and
+  nickname-preferred names all render correctly and match the results PDF's dark styling.
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 

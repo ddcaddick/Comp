@@ -2,39 +2,17 @@ import { Document, Page, StyleSheet, Text, View, pdf } from "@react-pdf/renderer
 import { formatMillis } from "@comp/core";
 import type { components } from "@comp/api-types";
 import { preferredName } from "./shooterName";
+import { pdfStyles, slugifyForFilename } from "./pdfTheme";
 
 type Participant = components["schemas"]["EventParticipantResultResponse"];
 
-// The ShooterRSG dark palette (clients/web/src/index.css / clients/mobile/src/lib/theme.ts),
-// repeated here rather than imported: react-pdf styles are plain objects evaluated outside
-// the DOM/CSS-variable pipeline, so there is no `var(--...)` to read at PDF-generation time.
-const colors = {
-  page: "#0b0c0f",
-  panel: "#141519",
-  border: "#2a2c33",
-  text: "#f2f2f0",
-  textMuted: "#9b9ca3",
-  accent: "#ff8a3d",
-};
-
+// Layout unique to the results PDF (the overall-table-left / league-tiles-right split);
+// everything else (page, title, tile, row, cell, footer, ...) comes from `pdfStyles`, shared
+// with every other generated PDF (see standingsPdf.tsx) so they read as one product.
 const styles = StyleSheet.create({
-  page: { backgroundColor: colors.page, color: colors.text, padding: 24, fontSize: 8, fontFamily: "Helvetica" },
-  title: { fontSize: 16, fontFamily: "Helvetica-Bold", color: colors.text },
-  eventHeading: { fontSize: 11, fontFamily: "Helvetica-Bold", color: colors.accent, marginTop: 2 },
-  subtitle: { fontSize: 9, color: colors.textMuted, marginTop: 2, marginBottom: 14 },
   body: { flexDirection: "row", gap: 14 },
   leftColumn: { width: "34%" },
   rightColumn: { flex: 1, flexDirection: "row", flexWrap: "wrap", gap: 10, alignContent: "flex-start" },
-  panelHeading: { fontSize: 10, fontFamily: "Helvetica-Bold", color: colors.accent, marginBottom: 6 },
-  panel: { backgroundColor: colors.panel, borderRadius: 4, borderWidth: 1, borderColor: colors.border, padding: 8 },
-  tile: { width: "48%", backgroundColor: colors.panel, borderRadius: 4, borderWidth: 1, borderColor: colors.border, padding: 8, marginBottom: 10 },
-  row: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: colors.border, paddingVertical: 2.5 },
-  headerRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: colors.accent, paddingBottom: 3, marginBottom: 2 },
-  headerCell: { fontFamily: "Helvetica-Bold", color: colors.accent, fontSize: 7.5 },
-  cell: { fontSize: 7.5, color: colors.text },
-  cellMuted: { fontSize: 7.5, color: colors.textMuted },
-  dnf: { color: colors.textMuted, fontStyle: "italic" },
-  footer: { position: "absolute", bottom: 16, left: 24, right: 24, fontSize: 7, color: colors.textMuted, flexDirection: "row", justifyContent: "space-between" },
 });
 
 function timeOrDnf(participant: Participant): string {
@@ -49,20 +27,20 @@ function OverallTable({ participants }: { participants: Participant[] }) {
   });
 
   return (
-    <View style={styles.panel}>
-      <Text style={styles.panelHeading}>Overall Results</Text>
-      <View style={styles.headerRow}>
-        <Text style={[styles.headerCell, { width: "14%" }]}>Pos</Text>
-        <Text style={[styles.headerCell, { width: "46%" }]}>Shooter</Text>
-        <Text style={[styles.headerCell, { width: "24%" }]}>League</Text>
-        <Text style={[styles.headerCell, { width: "16%", textAlign: "right" }]}>Time</Text>
+    <View style={pdfStyles.panel}>
+      <Text style={pdfStyles.panelHeading}>Overall Results</Text>
+      <View style={pdfStyles.headerRow}>
+        <Text style={[pdfStyles.headerCell, { width: "14%" }]}>Pos</Text>
+        <Text style={[pdfStyles.headerCell, { width: "46%" }]}>Shooter</Text>
+        <Text style={[pdfStyles.headerCell, { width: "24%" }]}>League</Text>
+        <Text style={[pdfStyles.headerCell, { width: "16%", textAlign: "right" }]}>Time</Text>
       </View>
       {sorted.map((p) => (
-        <View key={p.participantId} style={styles.row}>
-          <Text style={[styles.cell, { width: "14%" }]}>{p.status === "Dnf" ? "—" : p.overallPosition}</Text>
-          <Text style={[styles.cell, { width: "46%" }]}>{preferredName(p)}</Text>
-          <Text style={[styles.cellMuted, { width: "24%" }]}>{p.leagueName ?? "—"}</Text>
-          <Text style={[p.status === "Dnf" ? styles.dnf : styles.cell, { width: "16%", textAlign: "right" }]}>
+        <View key={p.participantId} style={pdfStyles.row}>
+          <Text style={[pdfStyles.cell, { width: "14%" }]}>{p.status === "Dnf" ? "—" : p.overallPosition}</Text>
+          <Text style={[pdfStyles.cell, { width: "46%" }]}>{preferredName(p)}</Text>
+          <Text style={[pdfStyles.cellMuted, { width: "24%" }]}>{p.leagueName ?? "—"}</Text>
+          <Text style={[p.status === "Dnf" ? pdfStyles.dnf : pdfStyles.cell, { width: "16%", textAlign: "right" }]}>
             {timeOrDnf(p)}
           </Text>
         </View>
@@ -79,22 +57,22 @@ function LeagueTile({ leagueName, participants }: { leagueName: string; particip
   });
 
   return (
-    <View style={styles.tile}>
-      <Text style={styles.panelHeading}>{leagueName}</Text>
-      <View style={styles.headerRow}>
-        <Text style={[styles.headerCell, { width: "14%" }]}>Pos</Text>
-        <Text style={[styles.headerCell, { width: "42%" }]}>Shooter</Text>
-        <Text style={[styles.headerCell, { width: "22%", textAlign: "right" }]}>Time</Text>
-        <Text style={[styles.headerCell, { width: "22%", textAlign: "right" }]}>Pts</Text>
+    <View style={pdfStyles.tile}>
+      <Text style={pdfStyles.panelHeading}>{leagueName}</Text>
+      <View style={pdfStyles.headerRow}>
+        <Text style={[pdfStyles.headerCell, { width: "14%" }]}>Pos</Text>
+        <Text style={[pdfStyles.headerCell, { width: "42%" }]}>Shooter</Text>
+        <Text style={[pdfStyles.headerCell, { width: "22%", textAlign: "right" }]}>Time</Text>
+        <Text style={[pdfStyles.headerCell, { width: "22%", textAlign: "right" }]}>Pts</Text>
       </View>
       {sorted.map((p) => (
-        <View key={p.participantId} style={styles.row}>
-          <Text style={[styles.cell, { width: "14%" }]}>{p.status === "Dnf" ? "—" : p.leaguePosition}</Text>
-          <Text style={[styles.cell, { width: "42%" }]}>{preferredName(p)}</Text>
-          <Text style={[p.status === "Dnf" ? styles.dnf : styles.cell, { width: "22%", textAlign: "right" }]}>
+        <View key={p.participantId} style={pdfStyles.row}>
+          <Text style={[pdfStyles.cell, { width: "14%" }]}>{p.status === "Dnf" ? "—" : p.leaguePosition}</Text>
+          <Text style={[pdfStyles.cell, { width: "42%" }]}>{preferredName(p)}</Text>
+          <Text style={[p.status === "Dnf" ? pdfStyles.dnf : pdfStyles.cell, { width: "22%", textAlign: "right" }]}>
             {timeOrDnf(p)}
           </Text>
-          <Text style={[styles.cell, { width: "22%", textAlign: "right" }]}>{p.leaguePoints}</Text>
+          <Text style={[pdfStyles.cell, { width: "22%", textAlign: "right" }]}>{p.leaguePoints}</Text>
         </View>
       ))}
     </View>
@@ -125,10 +103,10 @@ function ResultsPdfDocument({
 
   return (
     <Document>
-      <Page size="A4" orientation="landscape" style={styles.page}>
-        <Text style={styles.title}>{competitionName}</Text>
-        <Text style={styles.eventHeading}>{eventName} — Results</Text>
-        <Text style={styles.subtitle}>
+      <Page size="A4" orientation="landscape" style={pdfStyles.page}>
+        <Text style={pdfStyles.title}>{competitionName}</Text>
+        <Text style={pdfStyles.heading}>{eventName} — Results</Text>
+        <Text style={pdfStyles.subtitle}>
           {eventDate} · {isFinal ? "Final" : "Provisional (live)"}
         </Text>
         <View style={styles.body}>
@@ -141,7 +119,7 @@ function ResultsPdfDocument({
             ))}
           </View>
         </View>
-        <View style={styles.footer} fixed>
+        <View style={pdfStyles.footer} fixed>
           <Text>Generated {new Date().toLocaleString()} from Comp</Text>
           <Text render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
         </View>
@@ -163,8 +141,7 @@ export async function downloadResultsPdf(args: {
   link.href = url;
   // Includes the competition name -- "Week 1" alone is ambiguous once more than one
   // competition has an event by that name (this project's own demo data does).
-  const slug = `${args.competitionName}-${args.eventName}`.replace(/[^a-z0-9]+/gi, "-");
-  link.download = `${slug}-results.pdf`;
+  link.download = `${slugifyForFilename(args.competitionName, args.eventName)}-results.pdf`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
