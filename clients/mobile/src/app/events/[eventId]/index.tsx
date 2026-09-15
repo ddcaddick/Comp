@@ -1,8 +1,14 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "@/lib/api";
 import { colors, fonts } from "@/lib/theme";
+
+function errorDetail(error: unknown, fallback: string): string {
+  const detail = (error as { detail?: string | null } | undefined)?.detail;
+  return detail ?? fallback;
+}
 
 // A heartbeat older than this is treated as a stale, no-longer-relevant session rather
 // than someone actively entering right now.
@@ -12,6 +18,7 @@ export default function SquadListScreen() {
   const { eventId, name } = useLocalSearchParams<{ eventId: string; name?: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
 
   const squadsQuery = useQuery({
     queryKey: ["squads", eventId],
@@ -46,9 +53,13 @@ export default function SquadListScreen() {
         params: { path: { id: eventId } },
         body: { squadNumber: null, name: null },
       });
-      if (error) throw error;
+      if (error) throw new Error(errorDetail(error, "Could not add a squad."));
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["squads", eventId] }),
+    onSuccess: () => {
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ["squads", eventId] });
+    },
+    onError: (err: Error) => setError(err.message),
   });
 
   const assignToSquad = useMutation({
@@ -57,12 +68,14 @@ export default function SquadListScreen() {
         params: { path: { id: eventId, participantId } },
         body: { squadId, positionInSquad: null },
       });
-      if (error) throw error;
+      if (error) throw new Error(errorDetail(error, "Could not assign this shooter to a squad."));
     },
     onSuccess: () => {
+      setError(null);
       queryClient.invalidateQueries({ queryKey: ["participants", eventId] });
       queryClient.invalidateQueries({ queryKey: ["squads", eventId] });
     },
+    onError: (err: Error) => setError(err.message),
   });
 
   const session = sessionQuery.data;
@@ -102,6 +115,7 @@ export default function SquadListScreen() {
         </Pressable>
       </View>
 
+      {error && <Text style={styles.error}>{error}</Text>}
       {squadsQuery.isLoading && <ActivityIndicator color={colors.accent} style={styles.spinner} />}
       {squadsQuery.isError && <Text style={styles.error}>Could not load squads.</Text>}
 
