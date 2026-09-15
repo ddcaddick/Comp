@@ -52,7 +52,10 @@ export function CompetitionsPage() {
     <div>
       <h1 className="mb-4 text-lg font-semibold">Competitions</h1>
 
-      <form onSubmit={handleSubmit} className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border border-border p-4">
+      <form
+        onSubmit={handleSubmit}
+        className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-background p-4"
+      >
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-muted-foreground" htmlFor="comp-name">
             Name
