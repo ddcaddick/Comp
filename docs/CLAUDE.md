@@ -776,6 +776,65 @@ itself matters more than this first pass assumed. Verified by generating one on 
 emulator (downloaded, then opened in the OS's own PDF viewer) against real finalised-event
 demo data — DNF rows, league grouping and dark styling all render correctly.
 
+**The mobile app gained a Home screen and a real navigation structure.** Previously it went
+straight from sign-in to a single flat events list; it now has a bottom tab bar (`app/(tabs)/`,
+Expo Router's group convention — invisible in the URL, so every existing `/events/[eventId]/...`
+deep link kept working unchanged) with two tabs:
+
+- **Home** (`app/(tabs)/home.tsx`) — "Welcome, {name}" (top right, decoded client-side from the
+  access token's own `display_name`/`email` claims via the new `lib/jwt.ts` — display only,
+  never trusted for authorization) and a "Today's Events" list (`eventDate` matching the
+  device's *local* calendar date, not `toISOString()`'s UTC date, which drifts a day around
+  midnight in most timezones — see `todayIso()`). Tapping an event jumps straight into its
+  squad list, the same destination the old events list already used.
+- **Events** (`app/(tabs)/events.tsx`) — the old list, now with a horizontal row of
+  competition filter chips ("All" plus one per competition). Tapping "All" stays on this
+  unfiltered list; tapping a specific competition navigates to a new drill-down page
+  (`app/competitions/[competitionId].tsx`, outside the tabs group so it's a full-screen push
+  that naturally hides the tab bar) showing just that competition's events — this *is* the
+  "competition page," reached only through the filter, not a third tab.
+- Deep screens (event detail, add-participant, squad runner, entry) deliberately stay **outside**
+  `(tabs)/` at their original top-level paths rather than nested inside the Events tab's own
+  stack — pushing a sibling root-level screen is what makes the tab bar disappear automatically
+  on those screens without any manual `tabBarStyle` hiding logic.
+- Icons: this app was icon-free everywhere until this session (`+ Shooter`/`+ Squad` are plain
+  text buttons); per explicit user direction it now uses `@expo/vector-icons` (installed via
+  `npx expo install`, which resolves the SDK-57-compatible version rather than a guessed one —
+  see the EAS-CLI/font-version lesson above for why that matters) for the tab bar icons and a
+  few list affordances (chevrons, a calendar glyph on Home's empty state).
+- **Real bug found and fixed while building this**: the competition filter chips clipped the
+  top few pixels of every glyph (an "e" reading as "o", a capital "A" losing its peak) — not a
+  font problem (identical Archivo text elsewhere on the same screen, e.g. event row titles,
+  rendered perfectly), and not fixed by adding `lineHeight` to the chip text either. The actual
+  cause: the horizontal `ScrollView` had no explicit `style` height, only a
+  `contentContainerStyle` — on Android that can lay the ScrollView itself out at a
+  flex-collapsed height shorter than its content, clipping the content's paint to that shorter
+  box even though the pills themselves appeared full-size. Fixed by giving the `ScrollView` an
+  explicit `style={{ height: 44 }}` and moving the row's bottom margin onto that outer style
+  (`marginBottom`) rather than `paddingBottom` inside `contentContainerStyle`, so the gap
+  doesn't itself eat into the fixed height and reintroduce the same clipping. Worth remembering
+  for any future horizontal `ScrollView` in this app.
+- Sign-in now redirects to `/home` (was `/events`) after login and on an already-authenticated
+  relaunch.
+
+**Web admin gained a matching Home screen and navigation icons.** `routes/HomePage.tsx` is now
+the post-login landing page (`/`, `/login`'s redirect, and the root `Navigate` all point at
+`/home`): "Welcome, {name}" (same JWT-decode approach as mobile, `lib/jwt.ts`, browser `atob`
+instead of the dependency-free decoder RN needed), an "Upcoming Events" section (`eventDate`
+between today and today+7 inclusive) and a "Recent Events" section (today-14 through yesterday),
+both using the same local-calendar-date math as mobile's `todayIso()` (`lib/dates.ts`). Clicking
+an event card navigates to that event's competition's Events page — the actionable admin
+surface (advance/finalise/amend), not the read-only results page, since a Draft/Setup event has
+nothing to show there yet. `AppShell`'s nav gained icons via `lucide-react` (already an unused
+dependency in `package.json` since early on — this is its first real use) and a "Home" link;
+the signed-in user's name now shows in the header.
+
+The mobile sign-in screen's brand lockup (SR badge + SHOOTERRSG wordmark + "Ready. Standby. Go"
+tagline, grouped as one visual unit directly under the wordmark) is now replicated on
+`LoginPage`, styled the same way. `AppShell`'s own compact header mark deliberately did **not**
+gain the tagline — mobile itself only shows it on sign-in, never on every screen's header, so
+matching that scope kept the persistent nav mark unchanged.
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 
