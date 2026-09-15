@@ -143,8 +143,20 @@ profile as local testing — see the Commands section above):
 
 ```powershell
 cd clients/mobile
-EXPO_PUBLIC_API_BASE_URL=https://comp-api-staging.onrender.com npx eas build --platform android --profile internal
+npx eas build --platform android --profile internal
 ```
+
+The `internal` profile's `env.EXPO_PUBLIC_API_BASE_URL` in `eas.json` is what actually sets
+the URL baked into the APK — **not** a local shell env var. `eas build` (without `--local`)
+runs on Expo's own servers, which have no visibility into this machine's environment at all;
+a `$env:EXPO_PUBLIC_API_BASE_URL` set in PowerShell before running the command above does
+nothing for a cloud build (confirmed by EAS's own "No environment variables found for the
+'preview' environment" message when a build has neither this nor an EAS-hosted env var
+configured — it's not a benign notice, it means the build is about to silently embed the
+default `10.0.2.2` emulator-only address instead). To point a build at somewhere other than
+this staging URL (e.g. back at a LAN address for on-site testing), edit `eas.json`'s value
+and rebuild, or use `eas env:create` to manage it from EAS's dashboard instead of a committed
+file.
 
 **Two real, environment-specific things `Program.cs` now handles that local dev never
 exercises**, both found by actually running the built Docker image against a real Postgres
