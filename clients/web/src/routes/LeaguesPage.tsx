@@ -125,12 +125,20 @@ export function LeaguesPage() {
                   {league.pointsForFirst} → −{league.pointsDecrement}
                 </td>
                 <td className="py-2 pr-4">
-                  <Link
-                    to={`/competitions/${competitionId}/leagues/${league.id}`}
-                    className="text-primary hover:underline"
-                  >
-                    Roster →
-                  </Link>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      to={`/competitions/${competitionId}/leagues/${league.id}`}
+                      className="text-primary hover:underline"
+                    >
+                      Roster →
+                    </Link>
+                    <Link
+                      to={`/competitions/${competitionId}/leagues/${league.id}/standings`}
+                      className="text-primary hover:underline"
+                    >
+                      Standings →
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}

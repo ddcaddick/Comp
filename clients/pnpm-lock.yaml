@@ -270,6 +270,9 @@ importers:
       '@comp/api-types':
         specifier: workspace:*
         version: link:../packages/api-types
+      '@comp/core':
+        specifier: workspace:*
+        version: link:../packages/core
       '@tanstack/react-query':
         specifier: ^5.102.8
         version: 5.102.8(react@19.3.0)

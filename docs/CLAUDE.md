@@ -706,11 +706,44 @@ actually call `Comp.Scoring` from a running service.
   the standings positions actually flip); and the continuous drop-rule boundary
   (`eventsHeld == dropWorstCount` still provisional, matching D7).
 
-Not yet built: the M8 **web UI** (results tables, a per-league standings page, a "Finalise"
-button on the Events page when a event is in Review, an "Amend" button with a reason prompt
-when Finalised — the backend's role+claim gate is enough on its own, per this codebase's
-established convention of not also hiding actions client-side based on assumed roles), M9
-(hardening), and the actual EAS Android build and store submission (M10, per D11).
+**Milestone M8's web UI is complete.** Two new pages, plus small additions to the two M8
+already had:
+
+- `EventResultsPage` (`/competitions/:id/events/:eventId/results`) — `GET
+  /events/{id}/results`, with a league dropdown (`GET /competitions/{id}/leagues`) that
+  refetches with `?leagueId=` and switches the sort/position column from overall to that
+  league's. Shows "Provisional (live)" or "Final" from the response's own `isFinal`, never
+  inferred from the event's status client-side. Reuses `@comp/core`'s `formatMillis` for the
+  time column — the first web usage of that package, added as a new `clients/web`
+  dependency — rather than re-implementing `m:ss.cc` formatting a third time, per rule 4.
+- `LeagueStandingsPage` (`/competitions/:id/leagues/:leagueId/standings`) — `GET
+  /leagues/{id}/standings`, linked from both `LeaguesPage` and `LeagueRosterPage`. Shows
+  "(provisional)" next to a shooter's name from the response's own `isProvisional`, and the
+  header's "N events held" directly from `eventsHeld` — nothing about D7's drop-rule
+  threshold is computed or duplicated client-side, it's just displayed.
+- `EventsPage`'s status sequence now includes `Finalised`, reachable only from `Review`
+  (the backend still enforces this; the client just stops offering it as a manual jump from
+  elsewhere). The advance button reads "Finalise" specifically for that one transition,
+  "Advance to {status}" for the rest. A `Finalised` event gets an "Amend" button that prompts
+  for a reason with `window.prompt` (no dialog component exists yet in this codebase, and the
+  mobile app already established `Alert`/plain-prompt as this project's go-to for a one-off
+  confirmation) and calls `POST /events/{id}/amend` — there is no client-side hiding of this
+  button for a user who lacks the `CanAmendPublished` claim, matching every other
+  role-gated action in both clients: the backend's 403 is the actual enforcement.
+- `EventsPage` and `LeaguesPage` rows both gained a "Results →"/"Standings →" link.
+- Verified against the real API on the Android emulator's Chrome, not just typecheck/build:
+  seeded two shooters into an event via a throwaway script hitting the API directly (faster
+  and less error-prone than driving the whole add-participant flow through emulator taps for
+  data setup that mobile already exercises), walked the event Setup → InProgress → Review →
+  Finalised through the real UI, and confirmed the results table matches before/after
+  finalising (live vs. frozen, correct time formatting, correct overall position and league
+  points) and that Division A's standings page shows the finalised event's points. Also
+  caught, in passing, that `pnpm install` must be run from `clients/` (the actual pnpm
+  workspace root — there is no root-level `pnpm-workspace.yaml`), not the repo root, or a
+  newly added workspace dependency's symlink silently never gets created.
+
+Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
+per D11).
 
 Do not build a competition-data write endpoint before deciding how it authenticates — the
 audit interceptor throws if `SaveChangesAsync` runs with no current user (and no

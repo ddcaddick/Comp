@@ -1,13 +1,14 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { api } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { CompetitionTabs } from "../components/layout/CompetitionTabs";
 
-// Matches Comp.Domain.Enums.EventStatus — Finalised isn't reachable yet (that's M8).
-const STATUS_SEQUENCE = ["Draft", "Setup", "InProgress", "Review"];
+// Matches Comp.Domain.Enums.EventStatus. Finalised is reachable only from Review, and only
+// one-way through this sequence — going back requires Amend, not another transition.
+const STATUS_SEQUENCE = ["Draft", "Setup", "InProgress", "Review", "Finalised"];
 
 export function EventsPage() {
   const { competitionId } = useParams<{ competitionId: string }>();
@@ -80,6 +81,27 @@ export function EventsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["events", competitionId] }),
     onError: (err: Error) => setError(err.message),
   });
+
+  const amendEvent = useMutation({
+    mutationFn: async ({ eventId, reason }: { eventId: string; reason: string }) => {
+      const { error, response } = await api.POST("/events/{id}/amend", {
+        params: { path: { id: eventId } },
+        body: { reason },
+      });
+      if (error) {
+        const detail = (error as { detail?: string | null } | undefined)?.detail;
+        throw new Error(detail ?? `Could not amend event (${response.status}).`);
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["events", competitionId] }),
+    onError: (err: Error) => setError(err.message),
+  });
+
+  function handleAmend(eventId: string) {
+    const reason = window.prompt("Reason for amending this finalised event:");
+    if (!reason) return;
+    amendEvent.mutate({ eventId, reason });
+  }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -157,16 +179,34 @@ export function EventsPage() {
                   <td className="py-2 pr-4">{event.eventDate}</td>
                   <td className="py-2 pr-4">{event.status}</td>
                   <td className="py-2 pr-4">
-                    {nextStatus && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={transitionEvent.isPending}
-                        onClick={() => transitionEvent.mutate({ eventId: event.id, to: nextStatus })}
+                    <div className="flex items-center gap-3">
+                      <Link
+                        to={`/competitions/${competitionId}/events/${event.id}/results`}
+                        className="text-primary hover:underline"
                       >
-                        Advance to {nextStatus}
-                      </Button>
-                    )}
+                        Results →
+                      </Link>
+                      {nextStatus && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={transitionEvent.isPending}
+                          onClick={() => transitionEvent.mutate({ eventId: event.id, to: nextStatus })}
+                        >
+                          {nextStatus === "Finalised" ? "Finalise" : `Advance to ${nextStatus}`}
+                        </Button>
+                      )}
+                      {event.status === "Finalised" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={amendEvent.isPending}
+                          onClick={() => handleAmend(event.id)}
+                        >
+                          Amend
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
