@@ -2,5 +2,7 @@ packages:
   - 'packages/*'
   - 'web'
   - 'mobile'
+allowBuilds:
+  dtrace-provider: true
 minimumReleaseAgeExclude:
   - lucide-react@1.46.0
