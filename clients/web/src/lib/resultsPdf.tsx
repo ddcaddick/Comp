@@ -1,8 +1,8 @@
-import { Document, Page, StyleSheet, Text, View, pdf } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View, pdf } from "@react-pdf/renderer";
 import { formatMillis } from "@comp/core";
 import type { components } from "@comp/api-types";
 import { preferredName } from "./shooterName";
-import { pdfStyles, slugifyForFilename } from "./pdfTheme";
+import { clubBadgeUrl, pdfStyles, slugifyForFilename } from "./pdfTheme";
 
 type Participant = components["schemas"]["EventParticipantResultResponse"];
 
@@ -104,11 +104,16 @@ function ResultsPdfDocument({
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={pdfStyles.page}>
-        <Text style={pdfStyles.title}>{competitionName}</Text>
-        <Text style={pdfStyles.heading}>{eventName} — Results</Text>
-        <Text style={pdfStyles.subtitle}>
-          {eventDate} · {isFinal ? "Final" : "Provisional (live)"}
-        </Text>
+        <View style={pdfStyles.titleRow}>
+          <View>
+            <Text style={pdfStyles.title}>{competitionName}</Text>
+            <Text style={pdfStyles.heading}>{eventName} — Results</Text>
+            <Text style={pdfStyles.subtitle}>
+              {eventDate} · {isFinal ? "Final" : "Provisional (live)"}
+            </Text>
+          </View>
+          <Image src={clubBadgeUrl} style={pdfStyles.clubBadge} />
+        </View>
         <View style={styles.body}>
           <View style={styles.leftColumn}>
             <OverallTable participants={participants} />

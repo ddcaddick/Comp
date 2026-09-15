@@ -1,7 +1,7 @@
-import { Document, Page, StyleSheet, Text, View, pdf } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View, pdf } from "@react-pdf/renderer";
 import type { components } from "@comp/api-types";
 import { preferredName } from "./shooterName";
-import { pdfStyles, slugifyForFilename } from "./pdfTheme";
+import { clubBadgeUrl, pdfStyles, slugifyForFilename } from "./pdfTheme";
 import { todayIso } from "./dates";
 
 type LeagueStandings = components["schemas"]["LeagueStandingsResponse"];
@@ -55,8 +55,13 @@ function StandingsPdfDocument({
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={pdfStyles.page}>
-        <Text style={pdfStyles.title}>{competitionName}</Text>
-        <Text style={pdfStyles.heading}>As of {todayIso()}</Text>
+        <View style={pdfStyles.titleRow}>
+          <View>
+            <Text style={pdfStyles.title}>{competitionName}</Text>
+            <Text style={pdfStyles.heading}>As of {todayIso()}</Text>
+          </View>
+          <Image src={clubBadgeUrl} style={pdfStyles.clubBadge} />
+        </View>
         <View style={[styles.grid, { marginTop: 14 }]}>
           {sorted.map((league) => (
             <StandingsTile key={league.leagueId} standings={league} />

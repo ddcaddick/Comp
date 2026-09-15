@@ -4,6 +4,7 @@ import { CalendarDays, ChevronRight, History } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { addDaysIso, todayIso } from "../lib/dates";
+import clubBadge from "../assets/club-badge.png";
 
 export function HomePage() {
   const { user } = useAuth();
@@ -49,8 +50,13 @@ export function HomePage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-lg font-semibold">Welcome, {user?.displayName ?? "there"}</h1>
-      <p className="mb-8 text-sm text-muted-foreground">Here's what's happening at the club.</p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="mb-1 text-lg font-semibold">Welcome, {user?.displayName ?? "there"}</h1>
+          <p className="text-sm text-muted-foreground">Here's what's happening at the club.</p>
+        </div>
+        <img src={clubBadge} alt="Club badge" className="h-16 w-16 shrink-0 object-contain" />
+      </div>
 
       {isLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
       {!isLoading && eventsQuery.isError && <p className="text-sm text-destructive">Could not load events.</p>}
