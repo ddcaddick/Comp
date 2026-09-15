@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "@/lib/api";
+import { colors, fonts } from "@/lib/theme";
 
 // A heartbeat older than this is treated as a stale, no-longer-relevant session rather
 // than someone actively entering right now.
@@ -47,7 +48,7 @@ export default function SquadListScreen() {
         </View>
       )}
 
-      {squadsQuery.isLoading && <ActivityIndicator style={styles.spinner} />}
+      {squadsQuery.isLoading && <ActivityIndicator color={colors.accent} style={styles.spinner} />}
       {squadsQuery.isError && <Text style={styles.error}>Could not load squads.</Text>}
 
       <FlatList
@@ -77,14 +78,21 @@ export default function SquadListScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
-  banner: { backgroundColor: "#FFF3CD", borderRadius: 8, padding: 12, marginBottom: 12 },
-  bannerText: { color: "#7A5B00", fontSize: 14 },
+  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 20, paddingTop: 16 },
+  banner: {
+    backgroundColor: colors.errorBg,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  bannerText: { fontFamily: fonts.body, color: colors.accent, fontSize: 13 },
   spinner: { marginTop: 24 },
   list: { gap: 8, paddingBottom: 24 },
-  row: { borderWidth: 1, borderColor: "#e0e0e0", borderRadius: 10, padding: 16 },
-  rowTitle: { fontSize: 17, fontWeight: "600" },
-  rowSubtitle: { fontSize: 14, color: "#666", marginTop: 4 },
-  error: { color: "#c0392b", marginTop: 16 },
-  empty: { textAlign: "center", color: "#666", marginTop: 40 },
+  row: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 16, backgroundColor: colors.surface },
+  rowTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.textPrimary },
+  rowSubtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+  error: { color: colors.errorText, fontFamily: fonts.body, marginTop: 16 },
+  empty: { textAlign: "center", color: colors.textSecondary, fontFamily: fonts.body, marginTop: 40 },
 });

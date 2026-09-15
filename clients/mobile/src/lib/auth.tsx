@@ -6,7 +6,11 @@ interface AuthContextValue {
   /** True until the persisted tokens have been read from SecureStore once at startup. */
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{ success: true } | { success: false; error: string }>;
+  login: (
+    email: string,
+    password: string,
+    rememberMe: boolean,
+  ) => Promise<{ success: true } | { success: false; error: string }>;
   logout: () => Promise<void>;
 }
 
@@ -28,14 +32,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string, rememberMe: boolean) {
     const { data, error, response } = await api.POST("/auth/login", { body: { email, password } });
     if (error || !data) {
       const detail = (error as { detail?: string | null } | undefined)?.detail;
       return { success: false as const, error: detail ?? `Login failed (${response.status}).` };
     }
 
-    await setTokens(data.accessToken, data.refreshToken);
+    await setTokens(data.accessToken, data.refreshToken, rememberMe);
     setIsAuthenticated(true);
     return { success: true as const };
   }
