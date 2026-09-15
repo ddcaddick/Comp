@@ -248,7 +248,53 @@ the nearest centisecond), and `fast-check` property tests (round-trip through bo
 devDependencies lost at some point (silently working off whatever `web` happened to hoist)
 and an empty `tsconfig.json` (so `tsc --noEmit` type-checked nothing) — both fixed.
 
-Not yet built past M3: events/squads, the scoring engine, result entry, standings.
+**Milestone M5 (scoring engine) is complete.** `Comp.Scoring` implements the architecture
+doc's section I exactly, with one necessary extension:
+
+- **`EventScorer.Score(participants, eventRules, leagueRules)`** — the doc's illustrative
+  signature only takes one `EventRules`, but a single event scores for every league in
+  its competition simultaneously, each potentially configured with a different
+  `PointsForFirst`/`PointsDecrement`. `Score` takes a `IReadOnlyDictionary<Guid,
+  LeagueRules>` keyed by league instead, and throws if a participant's snapshotted league
+  has no entry in it. The D3 tie-break (compare the other run, faster wins; two valid
+  runs beats one; still equal, share the position) is implemented as a single sort key
+  (`EventTimeMs`, then whether there's a valid other run, then its value) rather than a
+  separate comparison pass — a true tie shares the position via standard competition
+  ranking (1, 2, 2, 4), applied identically to the overall table and to each league's.
+  `BestRunNumber` identifies the counting run by its `RunNumber`, not a database id — this
+  library has no concept of one; the caller maps back to the actual `Run` row via
+  (ParticipantId, BestRunNumber). No points floor (D4): the raw formula is never clamped.
+- **`StandingsCalculator.Calculate(points, leagueRules, eventsHeld)`** — `AbsencesCountAsZero`
+  is handled inside the calculator (pads a shooter's entries to `eventsHeld` with zeros)
+  rather than pushed onto every caller; when it's `false`, a missed event is simply
+  absent from that shooter's own list and doesn't count against or for them at all. The
+  drop rule is continuous (D7): with `dropWorstCount = N`, standings stay provisional
+  through event `N`, and from event `N+1` on always exclude the worst `N` to date.
+  Standings ties share position too, with no secondary tie-break (none is specified,
+  unlike event-night ties which have D3).
+- **Tests** (`tests/Comp.Scoring.Tests`, 21 tests): every edge case the testing-strategy
+  table names explicitly (both DNF, one DNF, single run, exact ties by each tie-break
+  step, zero and twenty penalties, absences with and without `AbsencesCountAsZero`, the
+  drop boundary at exactly `dropCount + 1`), `FsCheck` property tests for the four named
+  invariants (event time never slower than the best adjusted run; adding a penalty never
+  improves a position; counting total never exceeds running total; standings stable under
+  input reordering), a synthetic regression case covering the tie-break and DNF scenarios
+  the real fixture below happens not to contain, and **a real golden fixture**:
+  `RealEventGoldenFixtureTests` loads `Fixtures/2026-09-14-wednesbury-marksmen.json` (a
+  real scorecard the user supplied — the Wednesbury Marksmen Mini Rifle Competition,
+  46 shooters across 5 divisions, no penalties or DNFs recorded) and asserts
+  `EventScorer` reproduces every one of its overall positions and division
+  positions/points exactly. Per the testing-strategy table's "xUnit + committed JSON"
+  convention, the fixture data lives in its own JSON file, not hardcoded in the test —
+  add more real events as more JSON files under `Fixtures/` and a fact per file, following
+  this one's shape (`name`, `division`, `timeMs`, `overallPosition`, `divisionPosition`,
+  `divisionPoints`).
+- Deliberately not built in M5: persisting `EventScoringResult`/`LeagueStanding` into
+  `EventResult` rows, or any endpoint calling this library at all — that's M8 (results,
+  finalisation, standings), which needs events and runs to exist first (M6, M7).
+
+Not yet built past M5: events/squads (M6), live result entry (M7), results/finalisation/
+standings persistence and endpoints (M8), output/hardening (M9).
 
 Do not build a competition-data write endpoint before deciding how it authenticates — the
 audit interceptor throws if `SaveChangesAsync` runs with no current user (and no
