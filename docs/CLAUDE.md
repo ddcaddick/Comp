@@ -1061,6 +1061,34 @@ league-tiles-right split).
   opened the PDF for Mini Rifle (3 divisions), confirmed the header, per-league tiles, and
   nickname-preferred names all render correctly and match the results PDF's dark styling.
 
+**Replaced the default Expo template app icon with a real ShooterRSG one.** The sideloaded APK was
+showing Expo's generic blue chevron everywhere (launcher, adaptive icon, splash) since the app was
+scaffolded with those placeholder assets and nothing had ever swapped them out. Regenerated all
+five referenced under `assets/images/` — `icon.png` (1024×1024, full-bleed orange with the dark
+"SR" mark, for contexts with no OS-applied mask), `android-icon-foreground.png`/
+`android-icon-background.png` (the two adaptive-icon layers Android composites and masks itself —
+foreground keeps the glyph within the ~66% safe zone so it survives a circular or squircle
+launcher mask without clipping), `android-icon-monochrome.png` (a white silhouette on transparent,
+for Android 13+'s themed/tinted icon mode), and `splash-icon.png` (the same rounded orange badge
+shown on the sign-in screen, since the splash screen already sits on the same dark background).
+Built with .NET's `System.Drawing` via a throwaway PowerShell script (no image-editing tool was
+otherwise available in this environment) using the app's own real palette (`colors.accent` /
+`colors.accentText` from `lib/theme.ts`) rather than approximated hex values, then verified by
+compositing the transparent layers over both a dark backdrop and a simulated circular launcher
+mask before trusting them — the script itself was a one-off and isn't committed. `app.json`
+already pointed at all five paths from the initial scaffold, so no config change was needed, only
+the asset files themselves. A new EAS build is required to see this on a device — it's baked into
+the app package, not something a running app can hot-reload.
+
+The same splash badge is now also the browser favicon. `clients/web` had never had one at all —
+no `public/` directory, no `<link rel="icon">` in `index.html`, just whatever default a browser
+falls back to. Added `public/favicon.png` (Vite serves anything under `public/` from the site
+root unchanged, and copies it into `dist/` on build — confirmed in the build output) and a
+`<link rel="icon" type="image/png" href="/favicon.png" />` in `index.html`'s `<head>`. Mobile's
+own orphaned `assets/images/favicon.png` (unused — `app.json` has no `web` section, so Expo never
+builds a web target for this app) was updated to the same badge too, purely for consistency in
+case that ever changes.
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 
