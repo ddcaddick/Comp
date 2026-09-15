@@ -27,13 +27,13 @@ export default function SignInScreen() {
   }
 
   async function handleSubmit() {
-    if (!email.trim() || !password) {
+    if (!email.trim() || !password.trim()) {
       setError("Enter your email and password.");
       return;
     }
     setSubmitting(true);
     setError(null);
-    const result = await login(email.trim(), password, rememberMe);
+    const result = await login(email.trim(), password.trim(), rememberMe);
     setSubmitting(false);
     if (!result.success) {
       setError(result.error);
