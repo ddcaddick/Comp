@@ -20,6 +20,7 @@ const colors = {
 const styles = StyleSheet.create({
   page: { backgroundColor: colors.page, color: colors.text, padding: 24, fontSize: 8, fontFamily: "Helvetica" },
   title: { fontSize: 16, fontFamily: "Helvetica-Bold", color: colors.text },
+  eventHeading: { fontSize: 11, fontFamily: "Helvetica-Bold", color: colors.accent, marginTop: 2 },
   subtitle: { fontSize: 9, color: colors.textMuted, marginTop: 2, marginBottom: 14 },
   body: { flexDirection: "row", gap: 14 },
   leftColumn: { width: "34%" },
@@ -101,11 +102,13 @@ function LeagueTile({ leagueName, participants }: { leagueName: string; particip
 }
 
 function ResultsPdfDocument({
+  competitionName,
   eventName,
   eventDate,
   isFinal,
   participants,
 }: {
+  competitionName: string;
   eventName: string;
   eventDate: string;
   isFinal: boolean;
@@ -123,7 +126,8 @@ function ResultsPdfDocument({
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={styles.page}>
-        <Text style={styles.title}>{eventName} — Results</Text>
+        <Text style={styles.title}>{competitionName}</Text>
+        <Text style={styles.eventHeading}>{eventName} — Results</Text>
         <Text style={styles.subtitle}>
           {eventDate} · {isFinal ? "Final" : "Provisional (live)"}
         </Text>
@@ -147,6 +151,7 @@ function ResultsPdfDocument({
 }
 
 export async function downloadResultsPdf(args: {
+  competitionName: string;
   eventName: string;
   eventDate: string;
   isFinal: boolean;
@@ -156,7 +161,10 @@ export async function downloadResultsPdf(args: {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${args.eventName.replace(/[^a-z0-9]+/gi, "-")}-results.pdf`;
+  // Includes the competition name -- "Week 1" alone is ambiguous once more than one
+  // competition has an event by that name (this project's own demo data does).
+  const slug = `${args.competitionName}-${args.eventName}`.replace(/[^a-z0-9]+/gi, "-");
+  link.download = `${slug}-results.pdf`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
