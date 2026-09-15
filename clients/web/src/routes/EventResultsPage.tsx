@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { formatMillis } from "@comp/core";
 import { api } from "../lib/api";
+import { downloadResultsPdf } from "../lib/resultsPdf";
+import { Button } from "../components/ui/button";
 import { CompetitionTabs } from "../components/layout/CompetitionTabs";
 
 export function EventResultsPage() {
@@ -44,9 +46,48 @@ export function EventResultsPage() {
     enabled: !!eventId,
   });
 
+  // Always unfiltered, independent of the on-screen league dropdown above: the PDF shows
+  // the overall table and every league's tile side by side, regardless of which single
+  // league (if any) is currently selected for the on-screen table.
+  const overallResultsQuery = useQuery({
+    queryKey: ["event-results", eventId, ""],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/events/{id}/results", { params: { path: { id: eventId! } } });
+      if (error) throw new Error("Failed to load results");
+      return data;
+    },
+    enabled: !!eventId,
+  });
+
+  const [downloading, setDownloading] = useState(false);
+  async function handleDownloadPdf() {
+    if (!overallResultsQuery.data || !event) return;
+    setDownloading(true);
+    try {
+      await downloadResultsPdf({
+        eventName: event.name,
+        eventDate: event.eventDate,
+        isFinal: overallResultsQuery.data.isFinal,
+        participants: overallResultsQuery.data.participants,
+      });
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <div>
-      <h1 className="mb-1 text-lg font-semibold">{event ? `Results — ${event.name}` : "Results"}</h1>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h1 className="text-lg font-semibold">{event ? `Results — ${event.name}` : "Results"}</h1>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={downloading || !overallResultsQuery.data || !event}
+          onClick={handleDownloadPdf}
+        >
+          {downloading ? "Generating…" : "Download PDF"}
+        </Button>
+      </div>
       <CompetitionTabs competitionId={competitionId!} />
       <p className="mb-4 text-sm">
         <Link to={`/competitions/${competitionId}/events`} className="text-primary hover:underline">

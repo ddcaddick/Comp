@@ -30,6 +30,7 @@ scoring rules unchanged.
 | D9 | **Both** iOS and Android — the eventual target; see D11 for the phased path there. |
 | D10 | Mobile client in **Expo (React Native)**. |
 | D11 | **Prototyping phase targets Android only**, distributed as a sideloadable APK built through EAS Build's free cloud tier (internal-distribution profile) — no Apple Developer Program or Google Play Console account needed, and no App/Play Store review. iOS and store submission on both platforms resume as a later milestone (folded into M10) once the app is validated on real Android devices. |
+| D12 | **The per-event results PDF is a genuinely generated PDF** (`@react-pdf/renderer`, client-side in the web app), not the Phase 1 print-stylesheet approach this document otherwise specifies for results/standings output — built ahead of schedule at explicit user request, deviating from "generated PDFs beyond print stylesheets" being deferred without hesitation. Scoped narrowly to this one document (overall results left, one tile per league right, matching a real club scoresheet's layout); CSV export and the standings page still follow the original print-stylesheet plan unless asked otherwise. |
 
 ### Assumptions
 
@@ -129,12 +130,14 @@ publish. Amendment behind a privilege with a mandatory reason. Full audit trail.
 running total, counting total and dropped results.
 
 **Output.** Print-friendly HTML for results and standings giving a clean PDF through the browser.
-CSV export.
+CSV export. **Exception (D12):** a per-event results PDF (overall table plus a tile per league,
+mirroring a real club scoresheet) is a genuinely generated PDF, not a print stylesheet — brought
+forward from Phase 2 at explicit user request. See D12.
 
 ### Phase 2
 
-Offline-first mobile with a sync queue. Generated PDFs with club branding. Shooter self-service.
-Results-published email. Season summary reporting.
+Offline-first mobile with a sync queue. Generated PDFs with club branding beyond the one exception
+in D12. Shooter self-service. Results-published email. Season summary reporting.
 
 ### Future
 
@@ -919,7 +922,8 @@ parallel with paper before cutting over.
 
 **In:** M0 to M10.
 **Deferred without hesitation:** offline sync, shooter logins, public results pages, generated
-PDFs beyond print stylesheets, notifications, in-app timer, analytics, multi-club.
+PDFs beyond print stylesheets (except the one event-results PDF carved out in D12), notifications,
+in-app timer, analytics, multi-club.
 
 ---
 

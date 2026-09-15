@@ -742,6 +742,40 @@ already had:
   workspace root — there is no root-level `pnpm-workspace.yaml`), not the repo root, or a
   newly added workspace dependency's symlink silently never gets created.
 
+**Fixed a real mobile bug found during manual testing**: the squad list screen's `createSquad`
+and `assignToSquad` mutations (`app/events/[eventId]/index.tsx`) had no `onError` handler at
+all — a failed request (most commonly a 409 from trying to write to a `Finalised` event, which
+correctly locks every write per rule 8) just silently reverted the button with zero feedback,
+reading as "the UI doesn't appear to work" rather than a clear error. Fixed to match the
+pattern already used on `add-participant.tsx`: extract `detail` from the error response,
+surface it via `error` state and a `<Text>` below the action row.
+
+**Demo data**: the local dev database can be repopulated with a realistic dataset — two
+competitions (Mini Rifle with Division 1/2/3, Underlever with League Standing), 30 shooters
+(random names, real nicknames from the Wednesbury Marksmen scoresheet fixture), 5 finalised
+events per competition with random times/penalties/absences/DNFs on both runs. Built via
+throwaway Node scripts against the running API (not checked in) rather than a seed migration,
+since it's illustrative test data, not schema. Regenerate by resetting the dev database
+(`docker compose down -v && docker compose up -d`, then reapply migrations) and re-running the
+same approach if needed again.
+
+**Web admin gained a generated results PDF** (`lib/resultsPdf.tsx`, a "Download PDF" button on
+`EventResultsPage`) — **decision D12**, a deliberate deviation from the architecture doc's
+Phase 1 plan of print-stylesheet-only output, done at explicit user request ahead of schedule.
+Built with `@react-pdf/renderer` (React-component-based PDF layout, not a print stylesheet or
+a server-side library), matching the exact layout of a real club scoresheet the user supplied:
+an overall-results table on the left (Position/Shooter/League/Time) and a grid of one tile per
+league on the right (Position/Shooter/Time/Points), styled in the app's own dark ShooterRSG
+palette rather than the reference document's plain black-on-white. Always generated from the
+event's *unfiltered* results (a separate query from the on-screen league-dropdown-filtered
+table), since the PDF shows every league's tile at once regardless of what's currently
+selected on screen. Uses the built-in Helvetica font rather than embedding Archivo/JetBrains
+Mono — the CDN-hosted fonts aren't currently packaged as files `@react-pdf/renderer` can embed
+without adding network-fetch fragility to PDF generation; revisit if brand fidelity in the PDF
+itself matters more than this first pass assumed. Verified by generating one on the Android
+emulator (downloaded, then opened in the OS's own PDF viewer) against real finalised-event
+demo data — DNF rows, league grouping and dark styling all render correctly.
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 
