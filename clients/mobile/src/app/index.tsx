@@ -1,5 +1,17 @@
 import { useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Redirect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "@/lib/auth";
@@ -41,7 +53,10 @@ export default function SignInScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
       <View style={styles.hero}>
         <Image
           source={require("../../assets/images/sign-in-hero.png")}
@@ -66,7 +81,11 @@ export default function SignInScreen() {
         </View>
       </View>
 
-      <View style={styles.form}>
+      <ScrollView
+        contentContainerStyle={styles.form}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.heading}>Sign in</Text>
 
         <View style={styles.field}>
@@ -129,8 +148,8 @@ export default function SignInScreen() {
         </Pressable>
 
         <Text style={styles.footer}>Comp · v1.0.0</Text>
-      </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -174,7 +193,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     color: colors.textSecondary,
   },
-  form: { flex: 1, paddingHorizontal: 28, paddingTop: 26, gap: 18 },
+  form: { flexGrow: 1, paddingHorizontal: 28, paddingTop: 26, paddingBottom: 24, gap: 18 },
   heading: { fontFamily: fonts.semibold, fontSize: 23, color: colors.textPrimary },
   field: { gap: 7 },
   label: {

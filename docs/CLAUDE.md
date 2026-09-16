@@ -1195,6 +1195,70 @@ diff with no user-visible effect.)
 - Verified: `dotnet test` (backend, 91 API tests + 21 scoring tests, all still green — no test
   asserted the literal old string) and the local database check above.
 
+**Fixed the sign-in screen's keyboard covering the email/password fields on Android** (found
+testing the real APK, not the emulator). The screen had no keyboard-avoidance handling at all — a
+fixed-height (38%) hero image sat above a plain, non-scrolling form `View`, so the keyboard simply
+overlaid whatever was underneath it once it opened, hiding the email field partially and the
+password field entirely. Wrapped the screen in `KeyboardAvoidingView` (`behavior="padding"` on
+iOS, `"height"` on Android) with the form itself now a `ScrollView`
+(`keyboardShouldPersistTaps="handled"`) — React Native's `ScrollView` also auto-scrolls whichever
+`TextInput` currently has focus into view above the keyboard, which is the main thing actually
+fixing "hidden behind the keyboard" here, with `KeyboardAvoidingView` handling the rest. `form`'s
+style moved from `flex: 1` to `flexGrow: 1` (the correct property for a `ScrollView`'s
+`contentContainerStyle` — `flex` doesn't constrain content the same way once the parent is
+scrollable) so the footer's existing `marginTop: "auto"` still pushes it to the bottom on a tall
+screen with the keyboard closed, without changing its own layout code.
+- Not verified by screenshot on the Android emulator used elsewhere in this session — that AVD's
+  virtual hardware keyboard makes Gboard render as a compact floating toolbar rather than a full
+  on-screen keyboard (tried forcing it via `settings put secure show_ime_with_hard_keyboard 1`;
+  same compact toolbar either way), so the exact bug being fixed doesn't reproduce visually there.
+  The fix itself is the standard, well-established React Native pattern for this exact class of
+  bug and passes typecheck; treat it as confirmed once tested on the real APK, which is where the
+  user actually found the original bug.
+
+**Squads can now be reopened after being completed ("Amend"), in case a roster needs correcting.**
+Previously, completing a squad (`Allocated`) was one-way from the mobile UI — the "Complete"
+button simply disappeared with no way back short of directly editing the database.
+
+- `POST /events/{id}/squads/{squadId}/reopen` (`ISquadService.ReopenAsync`, same
+  Super Admin/Admin/Official gate as `complete`) is the mirror of the existing `complete`
+  endpoint: moves an `Allocated` squad back to `Pending`, idempotent (reopening an
+  already-pending squad is a no-op success), and refused on a `Finalised` event like every
+  other squad/participant write. A reopened squad immediately accepts new participants again
+  and reappears in the unassigned-shooters' squad-chip list, since both are simple filters on
+  the squad's live status, not a separate "locked" flag anywhere else.
+- The mobile squad list (`app/events/[eventId]/index.tsx`) shows "Amend" instead of "Complete"
+  once a squad is `Allocated`, calling the new endpoint. Per explicit user follow-up, "Amend" is
+  red (`colors.error`, distinct from "Complete"'s yellow `colors.warning` and the green
+  Allocated-row background, so all three don't read as the same signal), and both buttons now
+  share a `minWidth` so the action column doesn't visibly resize as a squad's status flips
+  between the two.
+- Tested end-to-end in `tests/Comp.Api.Tests/EventParticipantAndSquadEndpointTests.cs` (3 new
+  tests, 21/21 in that file): reopening unlocks and is idempotent, unlocks accepting new
+  participants again, 404s for an unknown squad/event, and the finalised-event lock also covers
+  `reopen`. Regenerated `@comp/api-types` for the new endpoint.
+- Verified live on the Android emulator via Expo Go: completed Squad 1 (turned green,
+  "Allocated"), confirmed "Amend" appeared in place of "Complete", tapped it, and watched the
+  squad flip back to yellow-bordered "Pending" with "Complete" restored.
+
+**Fixed two more real display bugs found testing the APK**, both on mobile:
+- **The squad list's `FlatList` had no `style` prop, only `contentContainerStyle`** — without an
+  explicit `style={{ flex: 1 }}`, a `FlatList` sizes to its own content rather than being clipped
+  and scrolled within the remaining screen space, so with enough squads/unassigned shooters the
+  last item rendered past the bottom of the screen with no way to scroll to it. Same root cause
+  category as the competition-filter-chip clipping bug from earlier in this project (an Android
+  `ScrollView`/`FlatList` needs an explicit outer `style` height or flex, not just a
+  `contentContainerStyle`), different manifestation. Verified by scrolling a real event with 12
+  unassigned shooters and zero squads all the way to its "No squads yet for this event." empty
+  state on the emulator — smooth internal scroll, nothing clipped.
+- **The Events tab's competition filter chips clipped again on a smaller/differently-scaled
+  device**, a recurrence of that same earlier bug. The original fix (an explicit `height: 44` on
+  the filter row's `ScrollView`) left only a few pixels of slack over the chip's own ~40px content
+  height, which a larger system font-scale accessibility setting could still exceed. Widened to
+  `height: 52` and set `allowFontScaling={false}` on the chip labels — a short, decorative filter
+  pill is a reasonable place to opt out of system font scaling entirely rather than keep chasing
+  larger fixed heights for every possible scale factor.
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 
