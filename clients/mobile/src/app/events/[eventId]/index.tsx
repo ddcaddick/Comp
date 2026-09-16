@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@/lib/api";
 import { preferredName } from "@/lib/shooterName";
 import { colors, fonts } from "@/lib/theme";
@@ -23,6 +24,7 @@ export default function SquadListScreen() {
   const { eventId, name } = useLocalSearchParams<{ eventId: string; name?: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const [error, setError] = useState<string | null>(null);
 
   const squadsQuery = useQuery({
@@ -203,7 +205,7 @@ export default function SquadListScreen() {
         style={styles.listContainer}
         data={squads}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: 24 + insets.bottom }]}
         ListHeaderComponent={
           unassigned.length > 0 ? (
             <View style={styles.unassignedSection}>
