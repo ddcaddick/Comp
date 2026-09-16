@@ -8,9 +8,13 @@ namespace Comp.Infrastructure.Leagues;
 
 public class LeagueService(CompDbContext dbContext) : ILeagueService
 {
-    // D4 in the architecture doc: leagues cap at 20 shooters, so 50-down-by-1 never
-    // reaches zero and no points floor is needed.
-    private const int MaxMembersPerLeague = 20;
+    // D4 in the architecture doc originally capped this at 20 specifically so the default
+    // scoring (50 points for 1st, -1 per position) never reached zero. Raised to 100 per
+    // explicit user direction -- the default scoring alone no longer guarantees that above
+    // position 50 (it goes negative), so a league expecting more than ~50 counted finishers
+    // needs its own PointsForFirst/PointsDecrement set accordingly; nothing enforces that
+    // automatically.
+    private const int MaxMembersPerLeague = 100;
 
     public async Task<LeagueResult> CreateAsync(Guid competitionId, CreateLeagueRequest request, CancellationToken cancellationToken)
     {

@@ -20,7 +20,7 @@ namespace Comp.Api.Tests;
 /// <summary>
 /// Drives /competitions/{id}/leagues and /leagues/{id}/members through the real HTTP
 /// pipeline: creation, the (competition_id, tier)/(competition_id, name) uniqueness
-/// guards, the 20-member cap (architecture doc D4), moving a shooter between leagues in
+/// guards, the 100-member cap (architecture doc D4), moving a shooter between leagues in
 /// the same competition, and that a closed competition locks both.
 /// </summary>
 public class LeagueEndpointTests : IAsyncLifetime
@@ -185,13 +185,13 @@ public class LeagueEndpointTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Setting_more_than_twenty_members_returns_a_conflict()
+    public async Task Setting_more_than_a_hundred_members_returns_a_conflict()
     {
         var competition = await CreateCompetitionAsync("Overfull Season", 2037);
         var league = await CreateLeagueAsync(competition.Id, "Division A", tier: 1);
 
         var shooterIds = new List<Guid>();
-        for (var i = 0; i < 21; i++)
+        for (var i = 0; i < 101; i++)
         {
             shooterIds.Add((await CreateShooterAsync($"Shooter{i}", "Overflow")).Id);
         }
