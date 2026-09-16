@@ -59,7 +59,7 @@ export default function SignInScreen() {
           </View>
           <View>
             <Text style={styles.wordmark}>
-              SHOOTER<Text style={{ color: colors.accent }}>RSG</Text>
+              SHOOTER<Text style={{ color: colors.accent }}>READY</Text>
             </Text>
             <Text style={styles.tagline}>Ready. Standby. Go</Text>
           </View>

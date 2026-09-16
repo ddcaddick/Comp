@@ -54,7 +54,7 @@ export default function HomeScreen() {
             <Text style={styles.badgeText}>SR</Text>
           </View>
           <Text style={styles.wordmark}>
-            SHOOTER<Text style={{ color: colors.accent }}>RSG</Text>
+            SHOOTER<Text style={{ color: colors.accent }}>READY</Text>
           </Text>
         </View>
         <View style={styles.topRow}>
