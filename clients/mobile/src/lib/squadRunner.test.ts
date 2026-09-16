@@ -14,6 +14,7 @@ function participant(
     shooterId: id,
     firstName: id,
     lastName: "Shooter",
+    nickname: null,
     positionInSquad,
     runs: runStates.map((isRecorded, index) => ({
       runNumber: index + 1,

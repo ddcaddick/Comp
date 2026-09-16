@@ -5,5 +5,6 @@ public record RunnerParticipantResponse(
     Guid ShooterId,
     string FirstName,
     string LastName,
+    string? Nickname,
     int? PositionInSquad,
     IReadOnlyList<RunnerRunState> Runs);

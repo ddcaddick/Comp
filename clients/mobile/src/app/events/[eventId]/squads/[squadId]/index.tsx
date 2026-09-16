@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "
 import { formatMillis } from "@comp/core";
 import type { components } from "@comp/api-types";
 import { api } from "@/lib/api";
+import { preferredName } from "@/lib/shooterName";
 import { findInitialOutstanding } from "@/lib/squadRunner";
 import { colors, fonts } from "@/lib/theme";
 
@@ -87,9 +88,7 @@ export default function SquadRunnerScreen() {
           }
         >
           <Text style={styles.nextUpLabel}>Next up · Run {nextUp.runNumber}</Text>
-          <Text style={styles.nextUpName}>
-            {nextUp.participant.firstName} {nextUp.participant.lastName}
-          </Text>
+          <Text style={styles.nextUpName}>{preferredName(nextUp.participant)}</Text>
           <Text style={styles.nextUpAction}>Enter time →</Text>
         </Pressable>
       )}
@@ -105,9 +104,7 @@ export default function SquadRunnerScreen() {
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <Text style={styles.rowName}>
-              {item.firstName} {item.lastName}
-            </Text>
+            <Text style={styles.rowName}>{preferredName(item)}</Text>
             <View style={styles.runCells}>
               {item.runs.map((run) => (
                 <Pressable
