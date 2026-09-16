@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { api } from "@/lib/api";
+import { preferredName } from "@/lib/shooterName";
 import { colors, fonts } from "@/lib/theme";
 
 // A heartbeat older than this is treated as a stale, no-longer-relevant session rather
@@ -176,9 +177,7 @@ export default function SquadListScreen() {
               {unassigned.map((participant) => (
                 <View key={participant.id} style={styles.unassignedRow}>
                   <View style={styles.unassignedHeader}>
-                    <Text style={styles.unassignedName}>
-                      {participant.firstName} {participant.lastName}
-                    </Text>
+                    <Text style={styles.unassignedName}>{preferredName(participant)}</Text>
                     <Text style={styles.unassignedTime}>{formatArrivalTime(participant.addedAt)}</Text>
                   </View>
                   <View style={styles.chipRow}>

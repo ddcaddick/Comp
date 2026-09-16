@@ -5,6 +5,7 @@ public record EventParticipantResponse(
     Guid ShooterId,
     string FirstName,
     string LastName,
+    string? Nickname,
     Guid? LeagueId,
     Guid? SquadId,
     int? PositionInSquad,

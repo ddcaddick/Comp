@@ -54,6 +54,7 @@ public class RunnerService(CompDbContext dbContext) : IRunnerService
         }
 
         return new RunnerParticipantResponse(
-            participant.Id, shooter.Id, shooter.FirstName, shooter.LastName, participant.PositionInSquad, runStates);
+            participant.Id, shooter.Id, shooter.FirstName, shooter.LastName, shooter.Nickname,
+            participant.PositionInSquad, runStates);
     }
 }

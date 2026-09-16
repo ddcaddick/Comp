@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "@/lib/api";
+import { preferredName } from "@/lib/shooterName";
 import { colors, fonts } from "@/lib/theme";
 
 function errorDetail(error: unknown, fallback: string): string {
@@ -103,9 +104,7 @@ export default function AddParticipantScreen() {
           const isAdded = addedShooterIds.has(shooter.id);
           return (
             <View key={shooter.id} style={styles.row}>
-              <Text style={styles.rowName}>
-                {shooter.firstName} {shooter.lastName}
-              </Text>
+              <Text style={styles.rowName}>{preferredName(shooter)}</Text>
               {isAdded ? (
                 <Text style={styles.rowAdded}>Added</Text>
               ) : (

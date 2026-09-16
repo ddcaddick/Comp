@@ -2293,6 +2293,7 @@ export interface components {
             shooterId: string;
             firstName: string;
             lastName: string;
+            nickname: null | string;
             /** Format: uuid */
             leagueId: null | string;
             /** Format: uuid */
@@ -2432,6 +2433,7 @@ export interface components {
             shooterId: string;
             firstName: string;
             lastName: string;
+            nickname: null | string;
             /** Format: int32 */
             positionInSquad: null | number | string;
             runs: components["schemas"]["RunnerRunState"][];

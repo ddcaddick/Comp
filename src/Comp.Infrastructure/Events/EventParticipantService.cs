@@ -21,7 +21,7 @@ public class EventParticipantService(CompDbContext dbContext, ICurrentUserAccess
             .Join(dbContext.Shooters, p => p.ShooterId, s => s.Id, (p, s) => new { p, s })
             .OrderBy(x => x.p.SquadId).ThenBy(x => x.p.PositionInSquad)
             .Select(x => new EventParticipantResponse(
-                x.p.Id, x.s.Id, x.s.FirstName, x.s.LastName, x.p.LeagueId, x.p.SquadId, x.p.PositionInSquad, x.p.AddedAt))
+                x.p.Id, x.s.Id, x.s.FirstName, x.s.LastName, x.s.Nickname, x.p.LeagueId, x.p.SquadId, x.p.PositionInSquad, x.p.AddedAt))
             .ToListAsync(cancellationToken);
     }
 
@@ -197,6 +197,7 @@ public class EventParticipantService(CompDbContext dbContext, ICurrentUserAccess
         shooter.Id,
         shooter.FirstName,
         shooter.LastName,
+        shooter.Nickname,
         participant.LeagueId,
         participant.SquadId,
         participant.PositionInSquad,
