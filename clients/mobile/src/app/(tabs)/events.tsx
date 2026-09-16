@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -7,6 +8,7 @@ import { colors, fonts } from "@/lib/theme";
 
 export default function EventListScreen() {
   const router = useRouter();
+  const [selectedCompetitionId, setSelectedCompetitionId] = useState<string | null>(null);
 
   const competitionsQuery = useQuery({
     queryKey: ["competitions"],
@@ -27,7 +29,9 @@ export default function EventListScreen() {
   });
 
   const competitionNameById = new Map((competitionsQuery.data ?? []).map((c) => [c.id, c.name]));
-  const events = [...(eventsQuery.data ?? [])].sort((a, b) => b.eventDate.localeCompare(a.eventDate));
+  const events = (eventsQuery.data ?? [])
+    .filter((e) => !selectedCompetitionId || e.competitionId === selectedCompetitionId)
+    .sort((a, b) => b.eventDate.localeCompare(a.eventDate));
 
   return (
     <View style={styles.container}>
@@ -42,18 +46,27 @@ export default function EventListScreen() {
         style={styles.filterScroll}
         contentContainerStyle={styles.filterRow}
       >
-        <View style={[styles.chip, styles.chipActive]}>
-          <Text style={[styles.chipText, styles.chipTextActive]} allowFontScaling={false}>
+        <Pressable
+          style={[styles.chip, selectedCompetitionId === null && styles.chipActive]}
+          onPress={() => setSelectedCompetitionId(null)}
+        >
+          <Text
+            style={[styles.chipText, selectedCompetitionId === null && styles.chipTextActive]}
+            allowFontScaling={false}
+          >
             All
           </Text>
-        </View>
+        </Pressable>
         {(competitionsQuery.data ?? []).map((competition) => (
           <Pressable
             key={competition.id}
-            style={styles.chip}
-            onPress={() => router.push({ pathname: "/competitions/[competitionId]", params: { competitionId: competition.id } })}
+            style={[styles.chip, selectedCompetitionId === competition.id && styles.chipActive]}
+            onPress={() => setSelectedCompetitionId(competition.id)}
           >
-            <Text style={styles.chipText} allowFontScaling={false}>
+            <Text
+              style={[styles.chipText, selectedCompetitionId === competition.id && styles.chipTextActive]}
+              allowFontScaling={false}
+            >
               {competition.name}
             </Text>
           </Pressable>
