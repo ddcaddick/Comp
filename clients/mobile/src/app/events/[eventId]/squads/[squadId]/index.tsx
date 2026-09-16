@@ -53,7 +53,13 @@ export default function SquadRunnerScreen() {
   const runner = runnerQuery.data;
   const nextUp = findInitialOutstanding(runner.participants);
 
-  function goToEntry(participantId: string, firstName: string, lastName: string, run: RunState) {
+  function goToEntry(
+    participantId: string,
+    firstName: string,
+    lastName: string,
+    nickname: string | null,
+    run: RunState,
+  ) {
     router.push({
       pathname: "/events/[eventId]/squads/[squadId]/entry",
       params: {
@@ -63,6 +69,7 @@ export default function SquadRunnerScreen() {
         runNumber: String(run.runNumber),
         firstName,
         lastName,
+        nickname: nickname ?? "",
         existingRawTimeMs: run.rawTimeMs === null ? "" : String(run.rawTimeMs),
         existingPenaltyCount: String(run.penaltyCount),
         existingIsDnf: String(run.isDnf),
@@ -83,6 +90,7 @@ export default function SquadRunnerScreen() {
               nextUp.participant.participantId,
               nextUp.participant.firstName,
               nextUp.participant.lastName,
+              nextUp.participant.nickname,
               nextUp.participant.runs[nextUp.runNumber - 1],
             )
           }
@@ -110,7 +118,7 @@ export default function SquadRunnerScreen() {
                 <Pressable
                   key={run.runNumber}
                   style={[styles.runCell, run.isRecorded && styles.runCellRecorded]}
-                  onPress={() => goToEntry(item.participantId, item.firstName, item.lastName, run)}
+                  onPress={() => goToEntry(item.participantId, item.firstName, item.lastName, item.nickname, run)}
                 >
                   <Text style={styles.runCellText}>
                     {run.isDnf ? "DNF" : run.isRecorded ? formatMillis(Number(run.rawTimeMs)) : `R${run.runNumber}`}

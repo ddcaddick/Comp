@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { digitsToMillis, formatMillis } from "@comp/core";
 import type { components } from "@comp/api-types";
 import { api } from "@/lib/api";
+import { preferredName } from "@/lib/shooterName";
 import { findInitialOutstanding } from "@/lib/squadRunner";
 import { colors, fonts } from "@/lib/theme";
 import { runnerQueryKey } from "./index";
@@ -30,6 +31,7 @@ export default function EntryScreen() {
     runNumber: string;
     firstName: string;
     lastName: string;
+    nickname?: string;
     existingRawTimeMs?: string;
     existingPenaltyCount?: string;
     existingIsDnf?: string;
@@ -40,6 +42,7 @@ export default function EntryScreen() {
   const insets = useSafeAreaInsets();
 
   const runNumber = Number(params.runNumber);
+  const displayName = preferredName({ firstName: params.firstName, lastName: params.lastName, nickname: params.nickname });
   const wasRecorded = params.existingIsRecorded === "true";
   const previousSummary = wasRecorded
     ? params.existingIsDnf === "true"
@@ -95,6 +98,7 @@ export default function EntryScreen() {
             runNumber: String(next.runNumber),
             firstName: next.participant.firstName,
             lastName: next.participant.lastName,
+            nickname: next.participant.nickname ?? "",
             existingRawTimeMs: "",
             existingPenaltyCount: "0",
             existingIsDnf: "false",
@@ -128,7 +132,7 @@ export default function EntryScreen() {
     if (wasRecorded) {
       Alert.alert(
         "Overwrite recorded time?",
-        `${params.firstName} ${params.lastName}'s run ${runNumber} is currently ${previousSummary}.`,
+        `${displayName}'s run ${runNumber} is currently ${previousSummary}.`,
         [
           { text: "Cancel", style: "cancel" },
           { text: "Overwrite", style: "destructive", onPress: () => saveMutation.mutate(body) },
@@ -146,7 +150,7 @@ export default function EntryScreen() {
     }
     Alert.alert(
       "Mark as DNF?",
-      `This clears any time entered for ${params.firstName} ${params.lastName}'s run ${runNumber}.`,
+      `This clears any time entered for ${displayName}'s run ${runNumber}.`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -179,9 +183,7 @@ export default function EntryScreen() {
       <Stack.Screen options={{ headerShown: true, title: `Run ${runNumber}` }} />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.name}>
-          {params.firstName} {params.lastName}
-        </Text>
+        <Text style={styles.name}>{displayName}</Text>
         {previousSummary && <Text style={styles.previous}>Previously: {previousSummary}</Text>}
 
         <Text style={[styles.timeDisplay, isDnf && styles.timeDisplayDnf]}>{displayTime}</Text>
