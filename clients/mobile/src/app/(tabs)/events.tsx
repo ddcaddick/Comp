@@ -43,7 +43,9 @@ export default function EventListScreen() {
         contentContainerStyle={styles.filterRow}
       >
         <View style={[styles.chip, styles.chipActive]}>
-          <Text style={[styles.chipText, styles.chipTextActive]}>All</Text>
+          <Text style={[styles.chipText, styles.chipTextActive]} allowFontScaling={false}>
+            All
+          </Text>
         </View>
         {(competitionsQuery.data ?? []).map((competition) => (
           <Pressable
@@ -51,7 +53,9 @@ export default function EventListScreen() {
             style={styles.chip}
             onPress={() => router.push({ pathname: "/competitions/[competitionId]", params: { competitionId: competition.id } })}
           >
-            <Text style={styles.chipText}>{competition.name}</Text>
+            <Text style={styles.chipText} allowFontScaling={false}>
+              {competition.name}
+            </Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -102,7 +106,13 @@ const styles = StyleSheet.create({
   // text against that shorter box even though the pills themselves paint at full size.
   // The gap below the row lives here (marginBottom), not as padding inside the scrollable
   // content, so it doesn't eat into that fixed height and reintroduce the same clipping.
-  filterScroll: { flexGrow: 0, height: 44, marginBottom: 16 },
+  // Sized with real slack above the chip's own ~40px content height (10 padding + 18
+  // lineHeight + 1 border, twice) -- a tight fit reintroduced the same clipping on a
+  // device with a smaller screen, most likely from a larger system font-scale setting
+  // pushing the rendered text past too-thin a margin; the chip text itself now also opts
+  // out of that scaling (allowFontScaling={false}) since a filter pill's label is short
+  // and decorative enough that a fixed size beats clipping across accessibility settings.
+  filterScroll: { flexGrow: 0, height: 52, marginBottom: 16 },
   filterRow: { gap: 8, alignItems: "center" },
   chip: {
     paddingVertical: 10,
