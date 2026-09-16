@@ -283,6 +283,43 @@ public class EventParticipantAndSquadEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Reopening_a_completed_squad_unlocks_it_and_is_idempotent()
+    {
+        var @event = await CreateEventAsync(16);
+        var squad = await CreateSquadAsync(@event.Id);
+
+        var complete = await _admin.PostAsync($"/events/{@event.Id}/squads/{squad.Id}/complete", content: null);
+        complete.EnsureSuccessStatusCode();
+
+        var reopen = await _admin.PostAsync($"/events/{@event.Id}/squads/{squad.Id}/reopen", content: null);
+        reopen.EnsureSuccessStatusCode();
+        Assert.Equal("Pending", (await reopen.Content.ReadFromJsonAsync<SquadResponse>())!.Status);
+
+        // Reopening an already-pending squad is a no-op success, not a conflict.
+        var again = await _admin.PostAsync($"/events/{@event.Id}/squads/{squad.Id}/reopen", content: null);
+        again.EnsureSuccessStatusCode();
+        Assert.Equal("Pending", (await again.Content.ReadFromJsonAsync<SquadResponse>())!.Status);
+
+        // A reopened squad accepts new participants again.
+        var shooter = await CreateShooterAsync("Late", "Arrival");
+        var addAfterReopen = await _admin.PostAsJsonAsync($"/events/{@event.Id}/participants",
+            new { shooterId = shooter.Id, squadId = squad.Id });
+        addAfterReopen.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Reopening_an_unknown_squad_or_event_returns_404()
+    {
+        var @event = await CreateEventAsync(17);
+
+        var unknownSquad = await _admin.PostAsync($"/events/{@event.Id}/squads/{Guid.NewGuid()}/reopen", content: null);
+        Assert.Equal(HttpStatusCode.NotFound, unknownSquad.StatusCode);
+
+        var unknownEvent = await _admin.PostAsync($"/events/{Guid.NewGuid()}/squads/{Guid.NewGuid()}/reopen", content: null);
+        Assert.Equal(HttpStatusCode.NotFound, unknownEvent.StatusCode);
+    }
+
+    [Fact]
     public async Task Assigning_a_participant_into_an_allocated_squad_returns_a_conflict()
     {
         var @event = await CreateEventAsync(14);
@@ -345,6 +382,9 @@ public class EventParticipantAndSquadEndpointTests : IAsyncLifetime
 
         var complete = await _admin.PostAsync($"/events/{@event.Id}/squads/{squad.Id}/complete", content: null);
         Assert.Equal(HttpStatusCode.Conflict, complete.StatusCode);
+
+        var reopen = await _admin.PostAsync($"/events/{@event.Id}/squads/{squad.Id}/reopen", content: null);
+        Assert.Equal(HttpStatusCode.Conflict, reopen.StatusCode);
 
         var addAnother = await _admin.PostAsJsonAsync($"/events/{@event.Id}/participants",
             new { shooterId = (await CreateShooterAsync("Also", "Locked")).Id });

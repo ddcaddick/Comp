@@ -202,5 +202,19 @@ public static class EventEndpoints
             .Produces<SquadResponse>()
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
+
+        events.MapPost("/{id:guid}/squads/{squadId:guid}/reopen", async (Guid id, Guid squadId, ISquadService service, CancellationToken ct) =>
+                (await service.ReopenAsync(id, squadId, ct)) switch
+                {
+                    SquadResult.Success success => Results.Ok(success.Squad),
+                    SquadResult.NotFound => Results.NotFound(),
+                    SquadResult.Conflict conflict =>
+                        Results.Problem(detail: conflict.Reason, statusCode: StatusCodes.Status409Conflict),
+                    _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
+                })
+            .RequireAuthorization(policy => policy.RequireRole(Roles.SuperAdmin, Roles.Admin, Roles.Official))
+            .Produces<SquadResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
     }
 }

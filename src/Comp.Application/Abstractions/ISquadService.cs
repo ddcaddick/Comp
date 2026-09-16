@@ -24,4 +24,10 @@ public interface ISquadService
     /// further shooters can be assigned into it. Idempotent -- completing an already-allocated
     /// squad just returns it unchanged rather than conflicting.</summary>
     Task<SquadResult> CompleteAsync(Guid eventId, Guid squadId, CancellationToken cancellationToken);
+
+    /// <summary>Undoes <see cref="CompleteAsync"/>, moving the squad back to
+    /// <see cref="Comp.Domain.Enums.SquadStatus.Pending"/> so it can be assigned into again and
+    /// its roster amended. Idempotent -- reopening an already-pending squad just returns it
+    /// unchanged rather than conflicting.</summary>
+    Task<SquadResult> ReopenAsync(Guid eventId, Guid squadId, CancellationToken cancellationToken);
 }
