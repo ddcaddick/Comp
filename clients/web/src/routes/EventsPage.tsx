@@ -349,30 +349,36 @@ export function EventsPage() {
                       >
                         Results →
                       </Link>
-                      {nextStatus && (
+                      {nextStatus ? (
                         <Button
                           variant="outline"
                           size="sm"
+                          className="w-40 whitespace-nowrap"
                           disabled={transitionEvent.isPending}
                           onClick={() => transitionEvent.mutate({ eventId: event.id, to: nextStatus })}
                         >
                           {nextStatus === "Finalised" ? "Finalise" : `Advance to ${nextStatus}`}
                         </Button>
+                      ) : (
+                        <div className="w-40" />
                       )}
-                      {event.status === "Finalised" && (
+                      {event.status === "Finalised" ? (
                         <Button
                           variant="outline"
                           size="sm"
+                          className="w-20"
                           disabled={amendEvent.isPending}
                           onClick={() => handleAmend(event.id)}
                         >
                           Amend
                         </Button>
+                      ) : (
+                        <div className="w-20" />
                       )}
-                      <Button variant="outline" size="sm" onClick={() => startEdit(event)}>
+                      <Button variant="outline" size="sm" className="w-16" onClick={() => startEdit(event)}>
                         Edit
                       </Button>
-                      <Button variant="destructive" size="sm" onClick={() => startDelete(event.id)}>
+                      <Button variant="destructive" size="sm" className="w-20" onClick={() => startDelete(event.id)}>
                         Delete
                       </Button>
                     </div>

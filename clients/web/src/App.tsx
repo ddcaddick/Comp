@@ -11,6 +11,7 @@ import { EventResultsPage } from "./routes/EventResultsPage";
 import { LeaguesPage } from "./routes/LeaguesPage";
 import { LeagueRosterPage } from "./routes/LeagueRosterPage";
 import { LeagueStandingsPage } from "./routes/LeagueStandingsPage";
+import { UsersPage } from "./routes/UsersPage";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ export function App() {
               <Route path="/home" element={<HomePage />} />
               <Route path="/shooters" element={<ShootersPage />} />
               <Route path="/competitions" element={<CompetitionsPage />} />
+              <Route path="/users" element={<UsersPage />} />
               <Route path="/competitions/:competitionId/events" element={<EventsPage />} />
               <Route path="/competitions/:competitionId/events/:eventId/results" element={<EventResultsPage />} />
               <Route path="/competitions/:competitionId/leagues" element={<LeaguesPage />} />

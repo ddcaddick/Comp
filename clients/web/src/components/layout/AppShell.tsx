@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { NavLink } from "react-router";
-import { Home, LogOut, Menu, Trophy, Users, X } from "lucide-react";
+import { Home, LogOut, Menu, Trophy, UserCog, Users, X } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 import { cn } from "../../lib/cn";
 import { Button } from "../ui/button";
@@ -14,6 +14,11 @@ const NAV_LINKS = [
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // "Manage users" is Super Admin only per the security model -- the backend's 403 is the
+  // actual enforcement (matching every other role-gated action in this app), this just
+  // avoids showing a whole nav destination that would fail for everyone else.
+  const navLinks = user?.role === "SUPER_ADMIN" ? [...NAV_LINKS, { to: "/users", label: "Users", icon: UserCog }] : NAV_LINKS;
 
   return (
     <div className="min-h-screen bg-muted">
@@ -34,7 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
 
           <nav className="hidden items-center gap-5 md:flex">
-            {NAV_LINKS.map((link) => (
+            {navLinks.map((link) => (
               <NavLink
                 key={link.to}
                 to={link.to}
@@ -72,7 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {menuOpen && (
           <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 md:hidden">
             <nav className="flex flex-col gap-3">
-              {NAV_LINKS.map((link) => (
+              {navLinks.map((link) => (
                 <NavLink
                   key={link.to}
                   to={link.to}
