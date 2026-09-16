@@ -52,6 +52,17 @@ export default function SquadListScreen() {
     },
   });
 
+  // Unfiltered (overall), same as the web results page's own overallResultsQuery -- only
+  // used here for each participant's NotRun/Dnf/Ranked status, not to rank anyone.
+  const resultsQuery = useQuery({
+    queryKey: ["event-results", eventId, ""],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/events/{id}/results", { params: { path: { id: eventId } } });
+      if (error) throw error;
+      return data ?? null;
+    },
+  });
+
   const createSquad = useMutation({
     mutationFn: async () => {
       const { error } = await api.POST("/events/{id}/squads", {
@@ -133,6 +144,12 @@ export default function SquadListScreen() {
     }
   }
 
+  // NotRun means literally zero runs recorded yet (see Comp.Scoring's DNF/NotRun split) --
+  // everything else (Ranked or Dnf) means at least one run, valid or not, has been entered.
+  const resultParticipants = resultsQuery.data?.participants ?? [];
+  const shotCount = resultParticipants.filter((p) => p.status !== "NotRun").length;
+  const toShootCount = resultParticipants.filter((p) => p.status === "NotRun").length;
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: true, title: name ?? "Squads" }} />
@@ -144,6 +161,23 @@ export default function SquadListScreen() {
           </Text>
         </View>
       )}
+
+      <View style={styles.statsBar}>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{shotCount}</Text>
+          <Text style={styles.statLabel}>Shot</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{toShootCount}</Text>
+          <Text style={styles.statLabel}>To Shoot</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{unassigned.length}</Text>
+          <Text style={styles.statLabel}>To Assign</Text>
+        </View>
+      </View>
 
       <View style={styles.actionRow}>
         <Pressable
@@ -173,7 +207,7 @@ export default function SquadListScreen() {
         ListHeaderComponent={
           unassigned.length > 0 ? (
             <View style={styles.unassignedSection}>
-              <Text style={styles.sectionLabel}>Unassigned ({unassigned.length})</Text>
+              <Text style={styles.sectionLabel}>Unassigned</Text>
               {unassigned.map((participant) => (
                 <View key={participant.id} style={styles.unassignedRow}>
                   <View style={styles.unassignedHeader}>
@@ -256,6 +290,26 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   bannerText: { fontFamily: fonts.body, color: colors.accent, fontSize: 13 },
+  statsBar: {
+    flexDirection: "row",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  statItem: { flex: 1, alignItems: "center" },
+  statDivider: { width: 1, backgroundColor: colors.border },
+  statValue: { fontFamily: fonts.extrabold, fontSize: 20, color: colors.textPrimary },
+  statLabel: {
+    fontFamily: fonts.monoBold,
+    fontSize: 10,
+    letterSpacing: 0.75,
+    textTransform: "uppercase",
+    color: colors.textMuted,
+    marginTop: 2,
+  },
   actionRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
   actionButton: {
     flex: 1,
