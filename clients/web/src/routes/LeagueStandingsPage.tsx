@@ -42,7 +42,7 @@ export function LeagueStandingsPage() {
               <th className="py-2 pr-4 font-medium text-muted-foreground">Pos</th>
               <th className="py-2 pr-4 font-medium text-muted-foreground">Name</th>
               <th className="py-2 pr-4 font-medium text-muted-foreground">Counting</th>
-              <th className="py-2 pr-4 font-medium text-muted-foreground">Dropped</th>
+              <th className="py-2 pr-4 font-medium text-muted-foreground">Missed</th>
               <th className="py-2 pr-4 font-medium text-muted-foreground">Running total</th>
             </tr>
           </thead>
@@ -55,7 +55,7 @@ export function LeagueStandingsPage() {
                   {s.isProvisional && <span className="ml-2 text-xs text-muted-foreground">(provisional)</span>}
                 </td>
                 <td className="py-2 pr-4">{s.countingTotal}</td>
-                <td className="py-2 pr-4">{s.droppedTotal}</td>
+                <td className="py-2 pr-4">{s.missedEvents}</td>
                 <td className="py-2 pr-4">{s.runningTotal}</td>
               </tr>
             ))}

@@ -68,6 +68,6 @@ public static class StandingsCalculator
         }
 
         return new LeagueStanding(
-            shooterPoints.ShooterId, runningTotal, countingTotal, runningTotal - countingTotal, isProvisional, 0);
+            shooterPoints.ShooterId, runningTotal, countingTotal, shooterPoints.EventsMissed, isProvisional, 0);
     }
 }

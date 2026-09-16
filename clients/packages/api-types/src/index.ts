@@ -2406,7 +2406,7 @@ export interface components {
             /** Format: int32 */
             countingTotal: number | string;
             /** Format: int32 */
-            droppedTotal: number | string;
+            missedEvents: number | string;
             isProvisional: boolean;
         };
         LeagueStandingsResponse: {

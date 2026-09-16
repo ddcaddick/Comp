@@ -1,9 +1,9 @@
 namespace Comp.Contracts.Leagues;
 
 /// <summary>
-/// <c>DroppedTotal</c> is <c>RunningTotal - CountingTotal</c>, zero while
-/// <c>IsProvisional</c> is true (the drop rule hasn't started applying yet — architecture
-/// doc decision D7).
+/// <c>MissedEvents</c> is how many of the competition's finalised, counting events this
+/// shooter has no real result for — a factual attendance count, unrelated to the league's
+/// worst-N drop rule (which only affects <c>CountingTotal</c>).
 /// </summary>
 public record LeagueStandingResponse(
     Guid ShooterId,
@@ -13,5 +13,5 @@ public record LeagueStandingResponse(
     int Position,
     int RunningTotal,
     int CountingTotal,
-    int DroppedTotal,
+    int MissedEvents,
     bool IsProvisional);

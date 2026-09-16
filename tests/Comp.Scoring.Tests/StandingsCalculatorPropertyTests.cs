@@ -18,7 +18,7 @@ public class StandingsCalculatorPropertyTests
         var dropWorst = dropWorstCandidate.Get % 10;
 
         var rules = new LeagueRules(50, 1, dropWorst, AbsencesCountAsZero: true);
-        var shooterPoints = new ShooterEventPoints(Guid.NewGuid(), points);
+        var shooterPoints = new ShooterEventPoints(Guid.NewGuid(), points, EventsMissed: 0);
 
         var standing = StandingsCalculator.Calculate([shooterPoints], rules, eventsHeld).Single();
 
@@ -34,9 +34,9 @@ public class StandingsCalculatorPropertyTests
 
         var shooters = new[]
         {
-            new ShooterEventPoints(Guid.NewGuid(), points1.Get.Select(p => p.Get % 51).Take(eventsHeld).ToList()),
-            new ShooterEventPoints(Guid.NewGuid(), points2.Get.Select(p => p.Get % 51).Take(eventsHeld).ToList()),
-            new ShooterEventPoints(Guid.NewGuid(), points3.Get.Select(p => p.Get % 51).Take(eventsHeld).ToList()),
+            new ShooterEventPoints(Guid.NewGuid(), points1.Get.Select(p => p.Get % 51).Take(eventsHeld).ToList(), EventsMissed: 0),
+            new ShooterEventPoints(Guid.NewGuid(), points2.Get.Select(p => p.Get % 51).Take(eventsHeld).ToList(), EventsMissed: 0),
+            new ShooterEventPoints(Guid.NewGuid(), points3.Get.Select(p => p.Get % 51).Take(eventsHeld).ToList(), EventsMissed: 0),
         };
 
         var original = StandingsCalculator.Calculate(shooters, rules, eventsHeld).ToDictionary(s => s.ShooterId);
