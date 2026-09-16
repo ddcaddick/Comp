@@ -39,7 +39,7 @@ export function LoginPage() {
           </div>
           <div className="flex flex-col leading-none">
             <span className="text-base font-extrabold tracking-widest">
-              SHOOTER<span className="text-primary">RSG</span>
+              SHOOTER<span className="text-primary">READY</span>
             </span>
             <span className="mt-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
               Ready. Standby. Go

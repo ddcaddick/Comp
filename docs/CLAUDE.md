@@ -1116,6 +1116,16 @@ rather than three independent copies).
   and both PDFs downloaded and opened for real finalised-event demo data, confirming the badge
   renders correctly top-right of "Mini Rifle" in each.
 
+**Rebranded the wordmark's accent word from "RSG" to "READY"** ("SHOOTER**READY**", orange, same
+position) across every place it appears — mobile's sign-in and Home screens, web's login page and
+`AppShell` nav — per explicit user direction; the "ShooterRSG"-named design tokens/comments in
+`theme.ts`/`index.css`/`pdfTheme.ts` were deliberately left alone since the user asked to change
+the on-screen wordmark, not rename the underlying design-system identifier. The installed mobile
+app's display name (`app.json`'s `expo.name`, previously the scaffold default "Comp") is now
+"ShooterReady" too — the launcher name is a separate field from the wordmark text and needed its
+own change per a follow-up request. `slug`/`scheme` were left untouched since those are tied to
+the already-registered EAS project and deep-link handling, not requested to change.
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 
