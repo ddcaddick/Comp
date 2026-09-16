@@ -168,6 +168,44 @@ public class EventService(CompDbContext dbContext, ICurrentUserAccessor currentU
         return new EventCommandResult.Success(ToResponse(@event));
     }
 
+    public async Task<EventCommandResult> DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var @event = await dbContext.Events.FindAsync([id], cancellationToken);
+        if (@event is null)
+        {
+            return new EventCommandResult.NotFound();
+        }
+
+        var participantIds = await dbContext.EventParticipants
+            .Where(p => p.EventId == id)
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken);
+
+        // Every one of these FKs is Restrict (see the relevant *Configuration classes), so a
+        // plain Events.Remove would fail at the database. EF Core topologically sorts pending
+        // deletes by the model's own FK graph within one SaveChangesAsync, so the removes below
+        // don't need to be sequenced by hand or split across multiple save calls.
+        var runs = await dbContext.Runs.Where(r => participantIds.Contains(r.EventParticipantId)).ToListAsync(cancellationToken);
+        var results = await dbContext.EventResults.Where(r => r.EventId == id).ToListAsync(cancellationToken);
+        var participants = await dbContext.EventParticipants.Where(p => p.EventId == id).ToListAsync(cancellationToken);
+        var squads = await dbContext.Squads.Where(s => s.EventId == id).ToListAsync(cancellationToken);
+        var entrySession = await dbContext.EntrySessions.SingleOrDefaultAsync(s => s.EventId == id, cancellationToken);
+
+        dbContext.Runs.RemoveRange(runs);
+        dbContext.EventResults.RemoveRange(results);
+        dbContext.EventParticipants.RemoveRange(participants);
+        dbContext.Squads.RemoveRange(squads);
+        if (entrySession is not null)
+        {
+            dbContext.EntrySessions.Remove(entrySession);
+        }
+        dbContext.Events.Remove(@event);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new EventCommandResult.Removed();
+    }
+
     private Guid RequireActorId() =>
         currentUser.UserId ?? throw new InvalidOperationException("No authenticated user for this write.");
 

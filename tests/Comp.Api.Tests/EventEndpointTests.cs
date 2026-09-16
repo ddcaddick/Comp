@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using Comp.Contracts.Auth;
 using Comp.Contracts.Competitions;
 using Comp.Contracts.Events;
+using Comp.Contracts.Shooters;
 using Comp.Infrastructure;
 using Comp.Infrastructure.Identity;
 using Microsoft.AspNetCore.Hosting;
@@ -215,6 +216,54 @@ public class EventEndpointTests : IAsyncLifetime
 
         var response = await _admin.PostAsJsonAsync($"/events/{created.Id}/transition", new { to = "NotARealStatus" });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Deleting_an_event_is_allowed_for_admin_but_not_official()
+    {
+        var created = await CreateEventAsync(40, "Deletable");
+
+        using var officialClient = await AuthenticatedClientAsync(Roles.Official);
+        var forbidden = await officialClient.DeleteAsync($"/events/{created.Id}");
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+
+        var response = await _admin.DeleteAsync($"/events/{created.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        var listed = await _admin.GetFromJsonAsync<List<EventResponse>>($"/events?competitionId={_competitionId}");
+        Assert.DoesNotContain(listed!, e => e.Id == created.Id);
+    }
+
+    [Fact]
+    public async Task Deleting_an_unknown_event_returns_404()
+    {
+        var response = await _admin.DeleteAsync($"/events/{Guid.NewGuid()}");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Deleting_an_event_also_removes_its_participants_and_squads()
+    {
+        var created = await CreateEventAsync(41, "Deletable With Participants");
+
+        var shooterResponse = await _admin.PostAsJsonAsync("/shooters", new { firstName = "To", lastName = "Delete" });
+        shooterResponse.EnsureSuccessStatusCode();
+        var shooter = await shooterResponse.Content.ReadFromJsonAsync<ShooterResponse>();
+
+        var participantResponse = await _admin.PostAsJsonAsync(
+            $"/events/{created.Id}/participants", new { shooterId = shooter!.Id });
+        participantResponse.EnsureSuccessStatusCode();
+
+        var squadResponse = await _admin.PostAsJsonAsync($"/events/{created.Id}/squads", new { });
+        squadResponse.EnsureSuccessStatusCode();
+
+        var response = await _admin.DeleteAsync($"/events/{created.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        // The event itself is gone, so anything scoped to it now reports not-found rather
+        // than stale participant/squad rows that should have been cascaded away with it.
+        var participantsAfter = await _admin.GetAsync($"/events/{created.Id}/participants");
+        Assert.Equal(HttpStatusCode.NotFound, participantsAfter.StatusCode);
     }
 
     private async Task<EventResponse> CreateEventAsync(int eventNumber, string name)

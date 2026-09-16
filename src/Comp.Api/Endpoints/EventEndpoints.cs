@@ -50,6 +50,19 @@ public static class EventEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        events.MapDelete("/{id:guid}", async (Guid id, IEventService service, CancellationToken ct) =>
+                (await service.DeleteAsync(id, ct)) switch
+                {
+                    EventCommandResult.Removed => Results.NoContent(),
+                    EventCommandResult.NotFound => Results.NotFound(),
+                    EventCommandResult.Conflict conflict =>
+                        Results.Problem(detail: conflict.Reason, statusCode: StatusCodes.Status409Conflict),
+                    _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
+                })
+            .RequireAuthorization(policy => policy.RequireRole(Roles.SuperAdmin, Roles.Admin))
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         events.MapPost("/{id:guid}/transition", async (Guid id, TransitionEventRequest request, IEventService service, CancellationToken ct) =>
                 (await service.TransitionAsync(id, request, ct)) switch
                 {

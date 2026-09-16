@@ -17,6 +17,11 @@ export function EventsPage() {
   const [name, setName] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const competitionsQuery = useQuery({
     queryKey: ["competitions"],
@@ -97,10 +102,83 @@ export function EventsPage() {
     onError: (err: Error) => setError(err.message),
   });
 
+  const updateEvent = useMutation({
+    mutationFn: async ({
+      eventId,
+      name,
+      eventDate,
+      penaltySeconds,
+      runsPerShooter,
+      countsForStandings,
+    }: {
+      eventId: string;
+      name: string;
+      eventDate: string;
+      penaltySeconds: number;
+      runsPerShooter: number;
+      countsForStandings: boolean;
+    }) => {
+      const { error, response } = await api.PATCH("/events/{id}", {
+        params: { path: { id: eventId } },
+        body: { name, eventDate, penaltySeconds, runsPerShooter, countsForStandings },
+      });
+      if (error) {
+        const detail = (error as { detail?: string | null } | undefined)?.detail;
+        throw new Error(detail ?? `Could not update event (${response.status}).`);
+      }
+    },
+    onSuccess: () => {
+      setEditingId(null);
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ["events", competitionId] });
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
+  const deleteEvent = useMutation({
+    mutationFn: async (eventId: string) => {
+      const { error, response } = await api.DELETE("/events/{id}", { params: { path: { id: eventId } } });
+      if (error) {
+        const detail = (error as { detail?: string | null } | undefined)?.detail;
+        throw new Error(detail ?? `Could not delete event (${response.status}).`);
+      }
+    },
+    onSuccess: () => {
+      setDeletingId(null);
+      setDeleteConfirmText("");
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ["events", competitionId] });
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
   function handleAmend(eventId: string) {
     const reason = window.prompt("Reason for amending this finalised event:");
     if (!reason) return;
     amendEvent.mutate({ eventId, reason });
+  }
+
+  function startEdit(event: { id: string; name: string; eventDate: string }) {
+    setEditingId(event.id);
+    setEditName(event.name);
+    setEditDate(event.eventDate);
+    setError(null);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setError(null);
+  }
+
+  function startDelete(eventId: string) {
+    setDeletingId(eventId);
+    setDeleteConfirmText("");
+    setError(null);
+  }
+
+  function cancelDelete() {
+    setDeletingId(null);
+    setDeleteConfirmText("");
   }
 
   function handleSubmit(event: FormEvent) {
@@ -158,6 +236,7 @@ export function EventsPage() {
       {eventsQuery.isError && <p className="text-sm text-destructive">Could not load events.</p>}
 
       {!eventsQuery.isLoading && !eventsQuery.isError && (
+        <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-border text-left">
@@ -172,6 +251,90 @@ export function EventsPage() {
             {(eventsQuery.data ?? []).map((event) => {
               const currentIndex = STATUS_SEQUENCE.indexOf(event.status);
               const nextStatus = currentIndex >= 0 ? STATUS_SEQUENCE[currentIndex + 1] : undefined;
+
+              if (deletingId === event.id) {
+                return (
+                  <tr key={event.id} className="border-b border-border bg-destructive/10">
+                    <td colSpan={5} className="py-4">
+                      <div className="flex flex-col gap-3">
+                        <p className="text-sm font-semibold text-destructive">
+                          Delete "{event.name}" permanently?
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          This removes its participants, squads, and any recorded runs or results.
+                          {event.status === "Finalised" &&
+                            " This event is finalised, so its results already count towards league standings — deleting it will change those totals."}
+                          {" "}
+                          This cannot be undone. Type the event name (<strong>{event.name}</strong>) to confirm.
+                        </p>
+                        <div className="flex items-center gap-3">
+                          <Input
+                            value={deleteConfirmText}
+                            onChange={(e) => setDeleteConfirmText(e.target.value)}
+                            placeholder={event.name}
+                            className="max-w-xs"
+                          />
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            disabled={deleteConfirmText !== event.name || deleteEvent.isPending}
+                            onClick={() => deleteEvent.mutate(event.id)}
+                          >
+                            {deleteEvent.isPending ? "Deleting..." : "Delete permanently"}
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={cancelDelete}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+
+              if (editingId === event.id) {
+                return (
+                  <tr key={event.id} className="border-b border-border bg-background">
+                    <td className="py-2 pr-4">{event.eventNumber}</td>
+                    <td className="py-2 pr-4">
+                      <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-8 w-40" />
+                    </td>
+                    <td className="py-2 pr-4">
+                      <Input
+                        type="date"
+                        value={editDate}
+                        onChange={(e) => setEditDate(e.target.value)}
+                        className="h-8"
+                      />
+                    </td>
+                    <td className="py-2 pr-4">{event.status}</td>
+                    <td className="py-2 pr-4">
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          disabled={!editName.trim() || !editDate || updateEvent.isPending}
+                          onClick={() =>
+                            updateEvent.mutate({
+                              eventId: event.id,
+                              name: editName.trim(),
+                              eventDate: editDate,
+                              penaltySeconds: Number(event.penaltySeconds),
+                              runsPerShooter: Number(event.runsPerShooter),
+                              countsForStandings: event.countsForStandings,
+                            })
+                          }
+                        >
+                          {updateEvent.isPending ? "Saving..." : "Save"}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={cancelEdit}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }
+
               return (
                 <tr key={event.id} className="border-b border-border">
                   <td className="py-2 pr-4">{event.eventNumber}</td>
@@ -206,6 +369,12 @@ export function EventsPage() {
                           Amend
                         </Button>
                       )}
+                      <Button variant="outline" size="sm" onClick={() => startEdit(event)}>
+                        Edit
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => startDelete(event.id)}>
+                        Delete
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -220,6 +389,7 @@ export function EventsPage() {
             )}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );
