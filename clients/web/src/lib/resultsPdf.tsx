@@ -3,6 +3,7 @@ import { formatMillis } from "@comp/core";
 import type { components } from "@comp/api-types";
 import { preferredName } from "./shooterName";
 import { clubBadgeUrl, pdfStyles, slugifyForFilename } from "./pdfTheme";
+import { formatResultStatus } from "./resultStatus";
 
 type Participant = components["schemas"]["EventParticipantResultResponse"];
 
@@ -15,8 +16,10 @@ const styles = StyleSheet.create({
   rightColumn: { flex: 1, flexDirection: "row", flexWrap: "wrap", gap: 10, alignContent: "flex-start" },
 });
 
-function timeOrDnf(participant: Participant): string {
-  return participant.eventTimeMs != null ? formatMillis(Number(participant.eventTimeMs)) : "DNF";
+function timeOrStatus(participant: Participant): string {
+  return participant.eventTimeMs != null
+    ? formatMillis(Number(participant.eventTimeMs))
+    : formatResultStatus(participant.status);
 }
 
 function OverallTable({ participants }: { participants: Participant[] }) {
@@ -37,11 +40,11 @@ function OverallTable({ participants }: { participants: Participant[] }) {
       </View>
       {sorted.map((p) => (
         <View key={p.participantId} style={pdfStyles.row}>
-          <Text style={[pdfStyles.cell, { width: "14%" }]}>{p.status === "DNF" ? "—" : p.overallPosition}</Text>
+          <Text style={[pdfStyles.cell, { width: "14%" }]}>{p.status !== "Ranked" ? "—" : p.overallPosition}</Text>
           <Text style={[pdfStyles.cell, { width: "46%" }]}>{preferredName(p)}</Text>
           <Text style={[pdfStyles.cellMuted, { width: "24%" }]}>{p.leagueName ?? "—"}</Text>
-          <Text style={[p.status === "DNF" ? pdfStyles.dnf : pdfStyles.cell, { width: "16%", textAlign: "right" }]}>
-            {timeOrDnf(p)}
+          <Text style={[p.status !== "Ranked" ? pdfStyles.dnf : pdfStyles.cell, { width: "16%", textAlign: "right" }]}>
+            {timeOrStatus(p)}
           </Text>
         </View>
       ))}
@@ -67,10 +70,10 @@ function LeagueTile({ leagueName, participants }: { leagueName: string; particip
       </View>
       {sorted.map((p) => (
         <View key={p.participantId} style={pdfStyles.row}>
-          <Text style={[pdfStyles.cell, { width: "14%" }]}>{p.status === "DNF" ? "—" : p.leaguePosition}</Text>
+          <Text style={[pdfStyles.cell, { width: "14%" }]}>{p.status !== "Ranked" ? "—" : p.leaguePosition}</Text>
           <Text style={[pdfStyles.cell, { width: "42%" }]}>{preferredName(p)}</Text>
-          <Text style={[p.status === "DNF" ? pdfStyles.dnf : pdfStyles.cell, { width: "22%", textAlign: "right" }]}>
-            {timeOrDnf(p)}
+          <Text style={[p.status !== "Ranked" ? pdfStyles.dnf : pdfStyles.cell, { width: "22%", textAlign: "right" }]}>
+            {timeOrStatus(p)}
           </Text>
           <Text style={[pdfStyles.cell, { width: "22%", textAlign: "right" }]}>{p.leaguePoints}</Text>
         </View>

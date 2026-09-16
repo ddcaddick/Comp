@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router";
 import { formatMillis } from "@comp/core";
 import { api } from "../lib/api";
 import { downloadResultsPdf } from "../lib/resultsPdf";
+import { formatResultStatus } from "../lib/resultStatus";
 import { Button } from "../components/ui/button";
 import { CompetitionTabs } from "../components/layout/CompetitionTabs";
 import { ShooterName } from "../lib/shooterName";
@@ -55,6 +56,10 @@ export function EventResultsPage() {
       return data;
     },
     enabled: !!eventId,
+    // Lets this page be left open on a display during live entry and update on its own as
+    // scores come in. Stops once the event is finalised -- a frozen result never changes,
+    // so there's nothing left to poll for.
+    refetchInterval: (query) => (query.state.data?.isFinal ? false : 5000),
   });
 
   // Always unfiltered, independent of the on-screen league dropdown above: the PDF shows
@@ -155,8 +160,10 @@ export function EventResultsPage() {
                   <ShooterName shooter={p} />
                 </td>
                 <td className="py-2 pr-4">{p.leagueName ?? "—"}</td>
-                <td className="py-2 pr-4">{p.eventTimeMs != null ? formatMillis(Number(p.eventTimeMs)) : "DNF"}</td>
-                <td className="py-2 pr-4">{p.status}</td>
+                <td className="py-2 pr-4">
+                  {p.eventTimeMs != null ? formatMillis(Number(p.eventTimeMs)) : formatResultStatus(p.status)}
+                </td>
+                <td className="py-2 pr-4">{formatResultStatus(p.status)}</td>
                 <td className="py-2 pr-4">{p.leaguePoints}</td>
               </tr>
             ))}
