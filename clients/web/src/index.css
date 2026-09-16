@@ -25,6 +25,8 @@
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
   --radius-md: var(--radius);
   --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -42,6 +44,11 @@
   --ring: #ff8a3d;
   --destructive: #ff9c9c;
   --destructive-foreground: #fff5f5;
+  /* Solid red for destructive buttons (Delete/Deactivate) -- distinct from --destructive
+     above, which is the paler tone used for error text and highlighting. Matches the
+     mobile app's colors.error (clients/mobile/src/lib/theme.ts). */
+  --danger: #ff4d4d;
+  --danger-foreground: #fff5f5;
   --radius: 0.5rem;
 }
 
