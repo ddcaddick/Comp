@@ -37,10 +37,10 @@ function OverallTable({ participants }: { participants: Participant[] }) {
       </View>
       {sorted.map((p) => (
         <View key={p.participantId} style={pdfStyles.row}>
-          <Text style={[pdfStyles.cell, { width: "14%" }]}>{p.status === "Dnf" ? "—" : p.overallPosition}</Text>
+          <Text style={[pdfStyles.cell, { width: "14%" }]}>{p.status === "DNF" ? "—" : p.overallPosition}</Text>
           <Text style={[pdfStyles.cell, { width: "46%" }]}>{preferredName(p)}</Text>
           <Text style={[pdfStyles.cellMuted, { width: "24%" }]}>{p.leagueName ?? "—"}</Text>
-          <Text style={[p.status === "Dnf" ? pdfStyles.dnf : pdfStyles.cell, { width: "16%", textAlign: "right" }]}>
+          <Text style={[p.status === "DNF" ? pdfStyles.dnf : pdfStyles.cell, { width: "16%", textAlign: "right" }]}>
             {timeOrDnf(p)}
           </Text>
         </View>
@@ -67,9 +67,9 @@ function LeagueTile({ leagueName, participants }: { leagueName: string; particip
       </View>
       {sorted.map((p) => (
         <View key={p.participantId} style={pdfStyles.row}>
-          <Text style={[pdfStyles.cell, { width: "14%" }]}>{p.status === "Dnf" ? "—" : p.leaguePosition}</Text>
+          <Text style={[pdfStyles.cell, { width: "14%" }]}>{p.status === "DNF" ? "—" : p.leaguePosition}</Text>
           <Text style={[pdfStyles.cell, { width: "42%" }]}>{preferredName(p)}</Text>
-          <Text style={[p.status === "Dnf" ? pdfStyles.dnf : pdfStyles.cell, { width: "22%", textAlign: "right" }]}>
+          <Text style={[p.status === "DNF" ? pdfStyles.dnf : pdfStyles.cell, { width: "22%", textAlign: "right" }]}>
             {timeOrDnf(p)}
           </Text>
           <Text style={[pdfStyles.cell, { width: "22%", textAlign: "right" }]}>{p.leaguePoints}</Text>
