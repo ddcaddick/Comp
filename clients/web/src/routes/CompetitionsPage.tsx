@@ -110,6 +110,9 @@ export function CompetitionsPage() {
               <th className="py-2 pr-4 font-medium text-muted-foreground">Year</th>
               <th className="py-2 pr-4 font-medium text-muted-foreground">Dates</th>
               <th className="py-2 pr-4 font-medium text-muted-foreground">Status</th>
+              <th className="py-2 pr-4 font-medium text-muted-foreground">Total shooters</th>
+              <th className="py-2 pr-4 font-medium text-muted-foreground">Average per event</th>
+              <th className="py-2 pr-4 font-medium text-muted-foreground">Shoots remaining</th>
               <th className="py-2 pr-4 font-medium text-muted-foreground" />
             </tr>
           </thead>
@@ -122,6 +125,9 @@ export function CompetitionsPage() {
                   {competition.startsOn} – {competition.endsOn}
                 </td>
                 <td className="py-2 pr-4">{competition.status}</td>
+                <td className="py-2 pr-4">{competition.totalShooters}</td>
+                <td className="py-2 pr-4">{Number(competition.averageShootersPerEvent).toFixed(1)}</td>
+                <td className="py-2 pr-4">{competition.eventsRemaining}</td>
                 <td className="py-2 pr-4">
                   <div className="flex gap-3">
                     <Link to={`/competitions/${competition.id}/events`} className="text-primary hover:underline">
@@ -136,7 +142,7 @@ export function CompetitionsPage() {
             ))}
             {(data ?? []).length === 0 && (
               <tr>
-                <td colSpan={5} className="py-4 text-center text-muted-foreground">
+                <td colSpan={8} className="py-4 text-center text-muted-foreground">
                   No competitions yet.
                 </td>
               </tr>

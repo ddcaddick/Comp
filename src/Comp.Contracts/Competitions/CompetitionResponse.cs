@@ -6,4 +6,7 @@ public record CompetitionResponse(
     int Year,
     DateOnly StartsOn,
     DateOnly EndsOn,
-    string Status);
+    string Status,
+    int TotalShooters,
+    decimal AverageShootersPerEvent,
+    int EventsRemaining);

@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Comp.Contracts.Auth;
 using Comp.Contracts.Competitions;
+using Comp.Contracts.Events;
+using Comp.Contracts.Shooters;
 using Comp.Infrastructure;
 using Comp.Infrastructure.Identity;
 using Microsoft.AspNetCore.Hosting;
@@ -150,7 +152,84 @@ public class CompetitionEndpointTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Listing_competitions_reports_total_shooters_average_and_events_remaining()
+    {
+        using var superAdmin = await AuthenticatedClientAsync(Roles.SuperAdmin);
+        using var admin = await AuthenticatedClientAsync(Roles.Admin);
+        using var official = await AuthenticatedClientAsync(Roles.Official);
+
+        var competitionResponse = await superAdmin.PostAsJsonAsync("/competitions",
+            new { name = "Stats Season", year = 2031, startsOn = "2031-01-01", endsOn = "2031-12-31" });
+        var competitionId = (await competitionResponse.Content.ReadFromJsonAsync<CompetitionResponse>())!.Id;
+
+        var shooterA = await CreateShooterAsync(admin, "Alice", "Shot-Both");
+        var shooterB = await CreateShooterAsync(admin, "Bob", "Dnf-Once");
+        var shooterC = await CreateShooterAsync(admin, "Carol", "Never-Called-Up");
+
+        var event1 = await CreateEventAsync(admin, competitionId, 1);
+        var event2 = await CreateEventAsync(admin, competitionId, 2);
+
+        // Event 1: A gets a valid time, B is DNF (still "shot"), C is added but never
+        // recorded a run at all -- so two distinct shooters actually shot this event.
+        var participantA1 = await AddParticipantAsync(official, event1, shooterA.Id);
+        var participantB1 = await AddParticipantAsync(official, event1, shooterB.Id);
+        await AddParticipantAsync(official, event1, shooterC.Id);
+        await SaveRunAsync(official, event1, participantA1, 1, rawTimeMs: 90_000, isDnf: false);
+        await SaveRunAsync(official, event1, participantB1, 1, rawTimeMs: null, isDnf: true);
+
+        // Event 2: only A shoots again -- same shooter as event 1, so Total shooters stays
+        // 2 (A, B) rather than double-counting A, but the per-event average still treats
+        // event 2 as "1 shooter shot" for its own count.
+        var participantA2 = await AddParticipantAsync(official, event2, shooterA.Id);
+        await SaveRunAsync(official, event2, participantA2, 1, rawTimeMs: 100_000, isDnf: false);
+
+        foreach (var to in new[] { "Setup", "InProgress", "Review", "Finalised" })
+        {
+            (await admin.PostAsJsonAsync($"/events/{event1}/transition", new { to })).EnsureSuccessStatusCode();
+        }
+        // event2 is deliberately left un-finalised, so EventsRemaining should be 1 (of 2).
+
+        var competitions = await official.GetFromJsonAsync<List<CompetitionResponse>>("/competitions");
+        var stats = competitions!.Single(c => c.Id == competitionId);
+
+        Assert.Equal(2, stats.TotalShooters);
+        Assert.Equal(1.5m, stats.AverageShootersPerEvent);
+        Assert.Equal(1, stats.EventsRemaining);
+    }
+
     private static string EmailFor(string role) => $"{role.ToLowerInvariant()}@example.com";
+
+    private static async Task<ShooterResponse> CreateShooterAsync(HttpClient client, string firstName, string lastName)
+    {
+        var response = await client.PostAsJsonAsync("/shooters", new { firstName, lastName });
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<ShooterResponse>())!;
+    }
+
+    private static async Task<Guid> CreateEventAsync(HttpClient client, Guid competitionId, int eventNumber)
+    {
+        var response = await client.PostAsJsonAsync("/events",
+            new { competitionId, eventNumber, name = $"Event {eventNumber}", eventDate = "2031-01-07" });
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<EventResponse>())!.Id;
+    }
+
+    private static async Task<Guid> AddParticipantAsync(HttpClient client, Guid eventId, Guid shooterId)
+    {
+        var response = await client.PostAsJsonAsync($"/events/{eventId}/participants", new { shooterId });
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<EventParticipantResponse>())!.Id;
+    }
+
+    private static async Task SaveRunAsync(
+        HttpClient client, Guid eventId, Guid participantId, int runNumber, int? rawTimeMs, bool isDnf)
+    {
+        var response = await client.PutAsJsonAsync(
+            $"/events/{eventId}/participants/{participantId}/runs/{runNumber}",
+            new { rawTimeMs, penaltyCount = 0, isDnf });
+        response.EnsureSuccessStatusCode();
+    }
 
     private async Task<HttpClient> AuthenticatedClientAsync(string role)
     {
