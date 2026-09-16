@@ -12,6 +12,8 @@ export function LeaguesPage() {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [tier, setTier] = useState("");
+  const [dropWorstCount, setDropWorstCount] = useState("0");
+  const [absencesCountAsZero, setAbsencesCountAsZero] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
 
@@ -72,8 +74,8 @@ export function LeaguesPage() {
           tier: Number(tier),
           pointsForFirst: null,
           pointsDecrement: null,
-          dropWorstCount: null,
-          absencesCountAsZero: null,
+          dropWorstCount: Number(dropWorstCount),
+          absencesCountAsZero,
         },
       });
       if (error || !data) {
@@ -85,6 +87,8 @@ export function LeaguesPage() {
     onSuccess: () => {
       setName("");
       setTier("");
+      setDropWorstCount("0");
+      setAbsencesCountAsZero(true);
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["leagues", competitionId] });
     },
@@ -130,6 +134,29 @@ export function LeaguesPage() {
             className="w-20"
           />
         </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="league-drop-worst">
+            Drop worst N events
+          </label>
+          <Input
+            id="league-drop-worst"
+            type="number"
+            min={0}
+            value={dropWorstCount}
+            onChange={(e) => setDropWorstCount(e.target.value)}
+            required
+            className="w-20"
+          />
+        </div>
+        <label className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={absencesCountAsZero}
+            onChange={(e) => setAbsencesCountAsZero(e.target.checked)}
+            className="h-4 w-4 rounded border-border"
+          />
+          Count absences as zero
+        </label>
         <Button type="submit" disabled={createLeague.isPending}>
           {createLeague.isPending ? "Creating..." : "New league"}
         </Button>
@@ -146,6 +173,7 @@ export function LeaguesPage() {
               <th className="py-2 pr-4 font-medium text-muted-foreground">Tier</th>
               <th className="py-2 pr-4 font-medium text-muted-foreground">Name</th>
               <th className="py-2 pr-4 font-medium text-muted-foreground">Points (1st → step)</th>
+              <th className="py-2 pr-4 font-medium text-muted-foreground">Drop worst</th>
               <th className="py-2 pr-4 font-medium text-muted-foreground" />
             </tr>
           </thead>
@@ -156,6 +184,10 @@ export function LeaguesPage() {
                 <td className="py-2 pr-4">{league.name}</td>
                 <td className="py-2 pr-4">
                   {league.pointsForFirst} → −{league.pointsDecrement}
+                </td>
+                <td className="py-2 pr-4">
+                  {league.dropWorstCount}
+                  {league.absencesCountAsZero ? "" : " (no absence padding)"}
                 </td>
                 <td className="py-2 pr-4">
                   <div className="flex items-center gap-3">
@@ -177,7 +209,7 @@ export function LeaguesPage() {
             ))}
             {(leaguesQuery.data ?? []).length === 0 && (
               <tr>
-                <td colSpan={4} className="py-4 text-center text-muted-foreground">
+                <td colSpan={5} className="py-4 text-center text-muted-foreground">
                   No leagues yet.
                 </td>
               </tr>

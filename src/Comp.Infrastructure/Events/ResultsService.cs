@@ -114,7 +114,12 @@ public class ResultsService(CompDbContext dbContext) : IResultsService
             .GroupBy(r => shooterIdByParticipant[r.EventParticipantId])
             .Select(g => new ShooterEventPoints(
                 g.Key,
-                g.OrderBy(r => eventOrder[r.EventId]).Select(r => r.LeaguePoints).ToList()))
+                g.OrderBy(r => eventOrder[r.EventId]).Select(r => r.LeaguePoints).ToList(),
+                // Attended = a real result exists and it's not NotRun (Ranked or Dnf both
+                // mean they were actually there); everything else -- NotRun, or no result
+                // at all because they were never entered -- counts as missed. This is a
+                // plain attendance count, independent of AbsencesCountAsZero/DropWorstCount.
+                eventsHeld - g.Where(r => r.Status != EventResultStatus.NotRun).Select(r => r.EventId).Distinct().Count()))
             .ToList();
 
         var rules = new LeagueRules(league.PointsForFirst, league.PointsDecrement, league.DropWorstCount, league.AbsencesCountAsZero);
@@ -133,7 +138,7 @@ public class ResultsService(CompDbContext dbContext) : IResultsService
             s.Position,
             s.RunningTotal,
             s.CountingTotal,
-            s.DroppedTotal,
+            s.MissedEvents,
             s.IsProvisional)).ToList();
 
         return new LeagueStandingsResult.Success(new LeagueStandingsResponse(league.Id, league.Name, eventsHeld, response));

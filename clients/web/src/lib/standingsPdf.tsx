@@ -23,7 +23,7 @@ function StandingsTile({ standings }: { standings: LeagueStandings }) {
         <Text style={[pdfStyles.headerCell, { width: "12%" }]}>Pos</Text>
         <Text style={[pdfStyles.headerCell, { width: "40%" }]}>Shooter</Text>
         <Text style={[pdfStyles.headerCell, { width: "18%", textAlign: "right" }]}>Count</Text>
-        <Text style={[pdfStyles.headerCell, { width: "15%", textAlign: "right" }]}>Drop</Text>
+        <Text style={[pdfStyles.headerCell, { width: "15%", textAlign: "right" }]}>Missed</Text>
         <Text style={[pdfStyles.headerCell, { width: "15%", textAlign: "right" }]}>Total</Text>
       </View>
       {sorted.map((s) => (
@@ -34,7 +34,7 @@ function StandingsTile({ standings }: { standings: LeagueStandings }) {
             {s.isProvisional ? " (prov.)" : ""}
           </Text>
           <Text style={[pdfStyles.cell, { width: "18%", textAlign: "right" }]}>{s.countingTotal}</Text>
-          <Text style={[pdfStyles.cellMuted, { width: "15%", textAlign: "right" }]}>{s.droppedTotal}</Text>
+          <Text style={[pdfStyles.cellMuted, { width: "15%", textAlign: "right" }]}>{s.missedEvents}</Text>
           <Text style={[pdfStyles.cell, { width: "15%", textAlign: "right" }]}>{s.runningTotal}</Text>
         </View>
       ))}

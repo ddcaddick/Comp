@@ -290,6 +290,87 @@ public class ResultsEndpointTests : IAsyncLifetime
         Assert.All(standingsResponse.Standings, s => Assert.Equal(s.RunningTotal, s.CountingTotal));
     }
 
+    [Fact]
+    public async Task Standings_report_missed_events_separately_from_the_drop_rule()
+    {
+        // A missed event and a "dropped for scoring" event are different things: a shooter
+        // who attends every event (even DNFing one) has MissedEvents = 0 even though the
+        // drop rule still excludes their worst result, while a shooter who skips an event
+        // entirely has MissedEvents = 1 regardless of whether that specific event ends up
+        // being the one dropped for scoring.
+        var dropLeague = await _superAdmin.PostAsJsonAsync($"/competitions/{_competitionId}/leagues",
+            new { name = "Division C", tier = 3, pointsForFirst = (int?)null, pointsDecrement = (int?)null, dropWorstCount = 1, absencesCountAsZero = (bool?)null });
+        dropLeague.EnsureSuccessStatusCode();
+        var leagueId = (await dropLeague.Content.ReadFromJsonAsync<LeagueResponse>())!.Id;
+
+        var shooterA = await CreateShooterAsync("Always", "There");
+        var shooterB = await CreateShooterAsync("Sometimes", "Missing");
+        await _superAdmin.PutAsJsonAsync($"/leagues/{leagueId}/members", new { shooterIds = new[] { shooterA.Id, shooterB.Id } });
+
+        // Event 1: both attend with a valid time.
+        var event1 = (await (await _admin.PostAsJsonAsync("/events",
+            new { competitionId = _competitionId, eventNumber = 1, name = "Missed test 1", eventDate = "2042-03-01" }))
+            .Content.ReadFromJsonAsync<EventResponse>())!;
+        var event1A = await AddParticipantAsync(event1.Id, shooterA.Id);
+        var event1B = await AddParticipantAsync(event1.Id, shooterB.Id);
+        await SaveRunAsync(event1.Id, event1A.Id, 90_000);
+        await SaveRunAsync(event1.Id, event1B.Id, 95_000);
+        foreach (var to in new[] { "Setup", "InProgress", "Review", "Finalised" })
+        {
+            (await _admin.PostAsJsonAsync($"/events/{event1.Id}/transition", new { to })).EnsureSuccessStatusCode();
+        }
+
+        // Event 2: only A is entered at all -- B genuinely misses this one.
+        var event2 = (await (await _admin.PostAsJsonAsync("/events",
+            new { competitionId = _competitionId, eventNumber = 2, name = "Missed test 2", eventDate = "2042-03-08" }))
+            .Content.ReadFromJsonAsync<EventResponse>())!;
+        var event2A = await AddParticipantAsync(event2.Id, shooterA.Id);
+        await SaveRunAsync(event2.Id, event2A.Id, 90_000);
+        foreach (var to in new[] { "Setup", "InProgress", "Review", "Finalised" })
+        {
+            (await _admin.PostAsJsonAsync($"/events/{event2.Id}/transition", new { to })).EnsureSuccessStatusCode();
+        }
+
+        // Event 3: both attend, but A DNFs both runs -- A was there, just scored zero.
+        var event3 = (await (await _admin.PostAsJsonAsync("/events",
+            new { competitionId = _competitionId, eventNumber = 3, name = "Missed test 3", eventDate = "2042-03-15" }))
+            .Content.ReadFromJsonAsync<EventResponse>())!;
+        var event3A = await AddParticipantAsync(event3.Id, shooterA.Id);
+        var event3B = await AddParticipantAsync(event3.Id, shooterB.Id);
+        await _official.PutAsJsonAsync($"/events/{event3.Id}/participants/{event3A.Id}/runs/1",
+            new { rawTimeMs = (int?)null, penaltyCount = 0, isDnf = true });
+        await _official.PutAsJsonAsync($"/events/{event3.Id}/participants/{event3A.Id}/runs/2",
+            new { rawTimeMs = (int?)null, penaltyCount = 0, isDnf = true });
+        await SaveRunAsync(event3.Id, event3B.Id, 95_000);
+        foreach (var to in new[] { "Setup", "InProgress", "Review", "Finalised" })
+        {
+            (await _admin.PostAsJsonAsync($"/events/{event3.Id}/transition", new { to })).EnsureSuccessStatusCode();
+        }
+
+        var standingsResponse = await _admin.GetFromJsonAsync<LeagueStandingsResponse>($"/leagues/{leagueId}/standings");
+        Assert.Equal(3, standingsResponse!.EventsHeld);
+
+        var standingA = standingsResponse.Standings.Single(s => s.ShooterId == shooterA.Id);
+        var standingB = standingsResponse.Standings.Single(s => s.ShooterId == shooterB.Id);
+
+        // A attended all three events (DNFing one doesn't count as missing it).
+        Assert.Equal(0, standingA.MissedEvents);
+        // B skipped event 2 entirely.
+        Assert.Equal(1, standingB.MissedEvents);
+
+        // Both still get exactly one event's points dropped (dropWorstCount = 1) -- for A
+        // that's the DNF'd event 3 (0 points, A ranked 1st in the other two); for B it's
+        // the padded zero for the missed event 2 (B ranked 2nd in event 1, 1st in event 3).
+        // Either way the dropped entry is worth 0, so CountingTotal == RunningTotal here --
+        // it's the MissedEvents count above that actually tells the two scenarios apart.
+        Assert.False(standingA.IsProvisional);
+        Assert.False(standingB.IsProvisional);
+        Assert.Equal(100, standingA.RunningTotal); // 50 (event1, 1st) + 50 (event2, 1st) + 0 (event3, DNF)
+        Assert.Equal(100, standingA.CountingTotal);
+        Assert.Equal(99, standingB.RunningTotal); // 49 (event1, 2nd) + 0 (event2, missed/padded) + 50 (event3, 1st)
+        Assert.Equal(99, standingB.CountingTotal);
+    }
+
     private async Task<(EventResponse Event, EventParticipantResponse Faster, EventParticipantResponse Slower)>
         SetUpEventInReviewAsync(int eventNumber, int fasterMs, int slowerMs)
     {
