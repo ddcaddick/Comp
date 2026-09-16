@@ -3,7 +3,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Crypto from "expo-crypto";
 import * as Haptics from "expo-haptics";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { digitsToMillis, formatMillis } from "@comp/core";
 import type { components } from "@comp/api-types";
 import { api } from "@/lib/api";
@@ -36,6 +37,7 @@ export default function EntryScreen() {
   }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
 
   const runNumber = Number(params.runNumber);
   const wasRecorded = params.existingIsRecorded === "true";
@@ -176,84 +178,87 @@ export default function EntryScreen() {
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: true, title: `Run ${runNumber}` }} />
 
-      <Text style={styles.name}>
-        {params.firstName} {params.lastName}
-      </Text>
-      {previousSummary && <Text style={styles.previous}>Previously: {previousSummary}</Text>}
-
-      <Text style={[styles.timeDisplay, isDnf && styles.timeDisplayDnf]}>{displayTime}</Text>
-
-      <Pressable style={[styles.dnfButton, isDnf && styles.dnfButtonActive]} onPress={handleToggleDnf}>
-        <Text style={[styles.dnfButtonText, isDnf && styles.dnfButtonTextActive]}>
-          {isDnf ? "DNF — tap to undo" : "Mark DNF"}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <Text style={styles.name}>
+          {params.firstName} {params.lastName}
         </Text>
-      </Pressable>
+        {previousSummary && <Text style={styles.previous}>Previously: {previousSummary}</Text>}
 
-      <View style={styles.penaltyRow}>
-        <Pressable
-          style={styles.penaltyButton}
-          disabled={penaltyCount === 0}
-          onPress={() => setPenaltyCount((count) => Math.max(0, count - 1))}
-        >
-          <Text style={styles.penaltyButtonText}>−</Text>
-        </Pressable>
-        <View style={styles.penaltyCountBox}>
-          <Text style={styles.penaltyCount}>{penaltyCount}</Text>
-          <Text style={styles.penaltyLabel}>penalties</Text>
-        </View>
-        <Pressable
-          style={styles.penaltyButton}
-          disabled={penaltyCount === MAX_PENALTIES}
-          onPress={() => setPenaltyCount((count) => Math.min(MAX_PENALTIES, count + 1))}
-        >
-          <Text style={styles.penaltyButtonText}>+</Text>
-        </Pressable>
-        <Pressable
-          style={styles.penaltyChip}
-          disabled={penaltyCount === MAX_PENALTIES}
-          onPress={() => setPenaltyCount((count) => Math.min(MAX_PENALTIES, count + 5))}
-        >
-          <Text style={styles.penaltyChipText}>+5</Text>
-        </Pressable>
-      </View>
+        <Text style={[styles.timeDisplay, isDnf && styles.timeDisplayDnf]}>{displayTime}</Text>
 
-      <View style={styles.keypad}>
-        {KEYPAD_ROWS.map((row, rowIndex) => (
-          <View key={rowIndex} style={styles.keypadRow}>
-            {row.map((key, keyIndex) =>
-              key === "" ? (
-                <View key={keyIndex} style={styles.keypadKey} />
-              ) : (
-                <Pressable
-                  key={keyIndex}
-                  style={styles.keypadKey}
-                  disabled={isDnf}
-                  onPress={() => handleKeyPress(key)}
-                >
-                  <Text style={styles.keypadKeyText}>{key === "back" ? "⌫" : key}</Text>
-                </Pressable>
-              ),
-            )}
+        <Pressable style={[styles.dnfButton, isDnf && styles.dnfButtonActive]} onPress={handleToggleDnf}>
+          <Text style={[styles.dnfButtonText, isDnf && styles.dnfButtonTextActive]}>
+            {isDnf ? "DNF — tap to undo" : "Mark DNF"}
+          </Text>
+        </Pressable>
+
+        <View style={styles.penaltyRow}>
+          <Pressable
+            style={styles.penaltyButton}
+            disabled={penaltyCount === 0}
+            onPress={() => setPenaltyCount((count) => Math.max(0, count - 1))}
+          >
+            <Text style={styles.penaltyButtonText}>−</Text>
+          </Pressable>
+          <View style={styles.penaltyCountBox}>
+            <Text style={styles.penaltyCount}>{penaltyCount}</Text>
+            <Text style={styles.penaltyLabel}>penalties</Text>
           </View>
-        ))}
-      </View>
+          <Pressable
+            style={styles.penaltyButton}
+            disabled={penaltyCount === MAX_PENALTIES}
+            onPress={() => setPenaltyCount((count) => Math.min(MAX_PENALTIES, count + 1))}
+          >
+            <Text style={styles.penaltyButtonText}>+</Text>
+          </Pressable>
+          <Pressable
+            style={styles.penaltyChip}
+            disabled={penaltyCount === MAX_PENALTIES}
+            onPress={() => setPenaltyCount((count) => Math.min(MAX_PENALTIES, count + 5))}
+          >
+            <Text style={styles.penaltyChipText}>+5</Text>
+          </Pressable>
+        </View>
 
-      {saveError && <Text style={styles.error}>{saveError}</Text>}
-      {lastSaved && !saveError && <Text style={styles.lastSaved}>Saved {lastSaved} ✓</Text>}
+        <View style={styles.keypad}>
+          {KEYPAD_ROWS.map((row, rowIndex) => (
+            <View key={rowIndex} style={styles.keypadRow}>
+              {row.map((key, keyIndex) =>
+                key === "" ? (
+                  <View key={keyIndex} style={styles.keypadKey} />
+                ) : (
+                  <Pressable
+                    key={keyIndex}
+                    style={styles.keypadKey}
+                    disabled={isDnf}
+                    onPress={() => handleKeyPress(key)}
+                  >
+                    <Text style={styles.keypadKeyText}>{key === "back" ? "⌫" : key}</Text>
+                  </Pressable>
+                ),
+              )}
+            </View>
+          ))}
+        </View>
 
-      <Pressable
-        style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
-        disabled={!canSave || saveMutation.isPending}
-        onPress={handleSave}
-      >
-        <Text style={styles.saveButtonText}>{saveMutation.isPending ? "Saving…" : "Save"}</Text>
-      </Pressable>
+        {saveError && <Text style={styles.error}>{saveError}</Text>}
+        {lastSaved && !saveError && <Text style={styles.lastSaved}>Saved {lastSaved} ✓</Text>}
+
+        <Pressable
+          style={[styles.saveButton, { marginBottom: 24 + insets.bottom }, !canSave && styles.saveButtonDisabled]}
+          disabled={!canSave || saveMutation.isPending}
+          onPress={handleSave}
+        >
+          <Text style={styles.saveButtonText}>{saveMutation.isPending ? "Saving…" : "Save"}</Text>
+        </Pressable>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 20, paddingTop: 16 },
+  container: { flex: 1, backgroundColor: colors.background },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 16 },
   name: { fontFamily: fonts.extrabold, fontSize: 30, textAlign: "center", color: colors.textPrimary },
   previous: { textAlign: "center", fontFamily: fonts.body, color: colors.textSecondary, marginTop: 4 },
   timeDisplay: {
@@ -321,7 +326,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 16,
     marginTop: 20,
-    marginBottom: 24,
     alignItems: "center",
   },
   saveButtonDisabled: { backgroundColor: colors.borderStrong },
