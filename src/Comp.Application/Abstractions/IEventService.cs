@@ -8,6 +8,8 @@ public abstract record EventCommandResult
 
     public sealed record Success(EventResponse Event) : EventCommandResult;
 
+    public sealed record Removed : EventCommandResult;
+
     public sealed record NotFound : EventCommandResult;
 
     public sealed record Conflict(string Reason) : EventCommandResult;
@@ -38,4 +40,14 @@ public interface IEventService
     /// privilege; this method doesn't check it itself.
     /// </summary>
     Task<EventCommandResult> AmendAsync(Guid id, AmendEventRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Permanently removes an event and everything recorded against it (participants,
+    /// squads, runs, and any frozen results), regardless of its current status. League
+    /// standings have no stored aggregate to reconcile — they're computed fresh from
+    /// whatever finalised events still exist — so deleting a finalised event simply removes
+    /// it from that computation; the client is responsible for warning the caller about that
+    /// before calling this.
+    /// </summary>
+    Task<EventCommandResult> DeleteAsync(Guid id, CancellationToken cancellationToken);
 }

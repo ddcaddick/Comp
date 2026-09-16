@@ -1126,6 +1126,49 @@ app's display name (`app.json`'s `expo.name`, previously the scaffold default "C
 own change per a follow-up request. `slug`/`scheme` were left untouched since those are tied to
 the already-registered EAS project and deep-link handling, not requested to change.
 
+**The Events page gained edit and delete**, the last real gap in event management — creating and
+transitioning events had UI since M6/M8, but nothing ever let you fix a typo'd name/date or remove
+an event entirely.
+
+- **Edit** reuses `PATCH /events/{id}`, which already existed and already blocks editing a
+  Finalised event (unchanged, pre-existing behaviour) — `EventsPage` just never exposed it. Same
+  inline-row-swap pattern as `ShootersPage`'s edit (a "Edit" button turns Name/Date into inputs
+  plus Save/Cancel), sending the event's own unchanged `penaltySeconds`/`runsPerShooter`/
+  `countsForStandings` back through since the endpoint takes the full record, not a partial patch.
+- **Delete is new end-to-end**: `DELETE /events/{id}` (`IEventService.DeleteAsync`, Super
+  Admin/Admin — same role gate as create/edit, not the stricter `CanAmendPublished` gate amend
+  uses, since the user's own framing treated this as a normal admin action with a client-side
+  warning, not a claim-gated one) cascades a real delete across everything that references the
+  event — `Run`, `EventResult`, `EventParticipant`, `Squad`, `EntrySession` — all Restrict FKs, so
+  the service loads and `RemoveRange`s each set itself; EF Core topologically sorts the actual
+  DELETE statements by the model's FK graph within one `SaveChangesAsync`, so the removes don't
+  need to be sequenced by hand. Allowed regardless of status, including Finalised — standings have
+  no stored aggregate to reconcile (they're computed live from whichever finalised events still
+  exist), so deleting a finalised event just removes it from that computation next time anyone
+  looks, which is exactly what the client warns about.
+- **The "challenge screen"** the user asked for is an inline confirmation panel (this codebase has
+  no dialog/modal component; `window.prompt` was the existing lightweight-confirmation precedent
+  for Amend) that replaces the event's row: states what gets removed, adds a sentence specifically
+  about league standings only when `event.status === "Finalised"` (a non-finalised event never
+  contributed to standings, so that clause would be misleading for one), and requires typing the
+  event's exact name into a field before "Delete permanently" enables — modelled on the
+  type-the-name-to-confirm pattern for a genuinely unrecoverable action.
+- Tested end-to-end in `tests/Comp.Api.Tests/EventEndpointTests.cs` (3 new tests, 91/91 passing
+  overall): the role gate, 404 for an unknown event, and a real cascade case (an event with a
+  participant and a squad attached) confirming both the delete itself succeeds and everything
+  scoped to that event now reports not-found rather than orphaned rows. Regenerated
+  `@comp/api-types` for the new endpoint (`tools/generate-api-types`).
+- Added a `destructive` `Button` variant (`bg-destructive`/`text-destructive-foreground` — the
+  tokens already existed, just unused as a button style) for Delete and "Delete permanently"; wrapped
+  the events table in `overflow-x-auto` since Edit+Delete pushed the action column past phone
+  width, a regression the table had no protection against before this change added two more
+  buttons to the row.
+- Verified live on the Android emulator: at phone width, confirmed the new horizontal scrollbar
+  reveals Delete; at desktop width (temporarily via `adb shell wm size`, avoiding the phone
+  table's own reflow-during-interaction confusion), ran the full delete flow against real
+  finalised-event demo data — warning text, exact-match gating, and the row actually disappearing
+  after a real cascade delete.
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 
