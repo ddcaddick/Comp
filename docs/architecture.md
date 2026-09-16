@@ -22,7 +22,7 @@ scoring rules unchanged.
 | D1 | Penalties applied **per run**: `adjusted = raw + (count × penaltySeconds)`. Fastest adjusted run across the shooter's valid runs becomes the event time. |
 | D2 | Times stored as integer milliseconds, entered and displayed as **`m:ss.cc`**. |
 | D3 | Ties broken on the shooter's **other** run; fastest wins. Still tied, position shared, both take the higher points. |
-| D4 | No points floor. Leagues cap at 20 shooters, so 50-down-by-1 never reaches zero. |
+| D4 | No points floor. Leagues cap at 100 shooters (raised from the original 20 — with the default 50-down-by-1 scoring that no longer guarantees a non-negative score past position 50, so a league expecting more than ~50 counted finishers needs its own `PointsForFirst`/`PointsDecrement` set accordingly). |
 | D5 | A missed event scores **0 and is droppable**. The drop rule doubles as an attendance allowance. |
 | D6 | **Competition** is the annual top level, holding ~5 leagues. Every event belongs to one competition and scores for all its leagues. |
 | D7 | Drop rule applies **continuously**. With `dropWorstCount = 5`, standings begin counting after event 6 and always exclude the worst five to date. |
@@ -52,7 +52,7 @@ tables of the annual competition those events belong to.
 
 ```
 Competition (annual)
-├── League "Division A"   tier 1   ≤20 shooters
+├── League "Division A"   tier 1   ≤100 shooters
 ├── League "Division B"   tier 2
 ├── League "Division C"   tier 3
 ├── League "Division D"   tier 4
@@ -620,7 +620,9 @@ per league (grouped by the participant's snapshotted LeagueId):
     RANKED participants ordered by eventTime ascending, ties broken as below
     points = PointsForFirst - (position - 1) * PointsDecrement
     DNF participants in that league receive 0
-    // no floor needed: leagues cap at 20 shooters
+    // no floor enforced: leagues cap at 100 shooters, but the default 50-down-by-1
+    // scoring only guarantees a non-negative score up to position 50 -- a league
+    // expecting more counted finishers needs its own PointsForFirst/PointsDecrement
 
 tie-break on equal eventTime:
     1. compare otherRun adjusted time, faster wins

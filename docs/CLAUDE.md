@@ -1259,6 +1259,85 @@ button simply disappeared with no way back short of directly editing the databas
   pill is a reasonable place to opt out of system font scaling entirely rather than keep chasing
   larger fixed heights for every possible scale factor.
 
+**Web admin gained User Management** — net-new scope, not a milestone catch-up (no milestone in
+the 15-week roadmap ever scheduled this). This closed a real, complete gap: despite code comments
+in `Program.cs` and this very file asserting "user creation is otherwise always an authenticated
+Super Admin/Admin/Official action," no such action existed anywhere — the only way to create a
+second login was touching the database directly, or re-running the one-shot dev/staging seed
+(which only ever fires once, against a database with zero users).
+
+- **New `UserEndpoints.cs`** (`/users`, `IUserService`/`UserService`) — list, create, edit
+  (display name + role), deactivate/reactivate, admin-set password reset, unlock a real Identity
+  lockout, and grant/revoke `CanAmendPublished`. Every endpoint is gated `RequireRole(SuperAdmin)`
+  **only** — per the security model's table, "Manage users" is Super Admin exclusive, stricter
+  than every other admin-CRUD in this app (usually Super Admin + Admin too).
+- **Self-lockout safety rails**, enforced in the service, not just the UI: a Super Admin can't
+  deactivate their own account, and can't change their own role (but can still rename themselves)
+  — both would otherwise risk a club with no one left who can undo it.
+- **Password strategy, per explicit user decision**: the admin types the account's password
+  directly (same pattern the staging `InitialAdmin` config already used) rather than a
+  generated one-time password or a real email invite/reset-link flow — there's no email-sending
+  infrastructure anywhere in this repo, and building one was explicitly scoped out for now.
+- **Role changes are audited explicitly at the call site**, not automatically: role assignment
+  lives in Identity's `AspNetUserRoles` join table, which `AuditSaveChangesInterceptor` has
+  always deliberately excluded (its own comment: "role/claim assignment is rare enough to audit
+  explicitly at the call site instead") since there's no single row there to attribute a
+  before/after diff to. `UserService` now does exactly that — one manual `AuditLog` row per role
+  change, `Before`/`After` JSON matching the interceptor's own shape, added directly since
+  `AuditLog` itself is also excluded (no risk of double-auditing the audit row).
+- **Unlocking** clears `LockoutEnd` and resets the failed-attempt counter directly via
+  `UserManager` — there was previously no way for anyone to see who was locked out (Identity's
+  own lockout was invisible outside a failed login's generic error) or to clear one early.
+- The web nav shows "Users" only when the signed-in user's own decoded role claim is
+  `SUPER_ADMIN` (`lib/auth.tsx`'s `CurrentUser` gained a `role` field, decoded from the JWT's
+  standard `ClaimTypes.Role` claim URI) — a UX nicety only, matching how every other role-gated
+  action in this app already works: the backend's 403 is the actual enforcement, never a
+  client-side check alone.
+- Tested end-to-end in `tests/Comp.Api.Tests/UserEndpointTests.cs` (13 new tests, 106/106 API
+  tests passing overall): the Super-Admin-only gate, create (including a real sign-in with the
+  set password, duplicate-email and unknown-role conflicts), edit (including the two self-
+  protection rules), deactivate/reactivate (including that a deactivated account really can't
+  sign in), password reset (old password stops working, new one works), a **real** Identity
+  lockout simulated directly via `UserManager.AccessFailedAsync` and then cleared via the unlock
+  endpoint, and granting/revoking `CanAmendPublished` with its mandatory reason. The lockout test
+  deliberately doesn't drive failed attempts through repeated `/auth/login` calls — that endpoint
+  has its own 5-per-minute-per-IP rate limit, and the test's own setup login already spends one
+  of those five permits, so looping over HTTP there would trip the limiter before Identity's
+  separate 5-failed-attempt counter ever reached its own threshold.
+- Verified live on the Android emulator's Chrome: signed in as the seeded Super Admin, created a
+  real account, edited its role via the dropdown, deactivated then reactivated it, all reflected
+  immediately.
+- **Real bug found and fixed while verifying this on the emulator, unrelated to the feature
+  itself**: Vite's dev server bound to the IPv6 loopback (`::1`) only on this run rather than
+  IPv4 `127.0.0.1` — `adb reverse` forwards to the host's IPv4 loopback, so every request from
+  the emulator silently failed (`ERR_EMPTY_RESPONSE`) even though the server was healthy and
+  reachable from the host itself. Not a code bug — just a note for next time this happens: start
+  Vite with an explicit `--host 127.0.0.1` (via the `vite` binary directly; `pnpm dev -- --host
+  127.0.0.1` didn't actually forward the flag through) rather than assuming `localhost` resolves
+  the same way on every run.
+
+**Raised the league member cap from 20 to 100** (architecture doc decision D4), per explicit user
+direction. The original 20 was specifically chosen so the default scoring (50 points for 1st,
+-1 per position) could never go negative; **that guarantee no longer holds past position 50** —
+a league expecting more than ~50 counted finishers now needs its own `PointsForFirst`/
+`PointsDecrement` set accordingly, since nothing enforces that automatically. Updated everywhere
+the old cap was asserted: `LeagueService.MaxMembersPerLeague`, `LeagueRosterPage.tsx`'s
+`MAX_MEMBERS`, `LeagueEndpointTests.cs`'s over-cap test, and `docs/architecture.md`'s D4 entry,
+structure diagram, and scoring pseudocode comment, all updated to match.
+
+**Fixed a button-alignment bug on both `UsersPage` and `EventsPage`**, found during the User
+Management review above: action buttons were laid out as a plain `flex` row with no explicit
+widths, so a later button (Deactivate, Edit, Delete) visibly shifted left or right from one row
+to the next depending on how long the *preceding* button's own label happened to be (e.g.
+"Grant amend" vs "Revoke amend", or "Finalise" vs "Advance to InProgress") — and, on
+`EventsPage`, additionally shifted depending on whether a conditional button (Amend; the
+transition button once an event has no further status to advance to) was present at all. Fixed
+by giving every action button in both rows an explicit fixed width (with `whitespace-nowrap`
+where a label was close to wrapping at that width), and, for `EventsPage`'s two conditional
+slots, rendering an equally-sized empty placeholder `div` when the button itself isn't shown —
+so every row's Edit/Delete (or Deactivate/Reactivate) column lines up in exactly the same place
+regardless of that row's own status.
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 

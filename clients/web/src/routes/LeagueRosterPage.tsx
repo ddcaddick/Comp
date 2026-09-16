@@ -6,7 +6,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { CompetitionTabs } from "../components/layout/CompetitionTabs";
 
-const MAX_MEMBERS = 20;
+const MAX_MEMBERS = 100;
 
 export function LeagueRosterPage() {
   const { competitionId, leagueId } = useParams<{ competitionId: string; leagueId: string }>();
