@@ -4,5 +4,9 @@ namespace Comp.Domain.Enums;
 public enum EventResultStatus
 {
     Ranked,
-    Dnf
+
+    // Named in all caps deliberately -- ToString() on this value is what the API and every
+    // client display directly (never "Dnf"), matching how DNF is written everywhere else in
+    // the app (the results PDF, the mobile entry screen's DNF control).
+    DNF
 }

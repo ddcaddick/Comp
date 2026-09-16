@@ -1169,6 +1169,32 @@ an event entirely.
   finalised-event demo data — warning text, exact-match gating, and the row actually disappearing
   after a real cascade delete.
 
+**A DNF result's status now reads "DNF" everywhere, not "Dnf" in some places.** The league and
+event results tables displayed the API's raw `Status` string directly, which came straight from
+`EventResultStatus.Dnf.ToString()` — every *other* place DNF appears in this app (the results PDF's
+time column, the mobile entry screen's DNF control) already spelled it in caps, so the status
+column alone read inconsistently. Fixed at the source rather than patched at each display site, per
+explicit user direction ("wherever it's stored"): renamed the enum member itself,
+`Comp.Domain.Enums.EventResultStatus.Dnf` → `DNF`, so its `.ToString()` is correct everywhere by
+construction. (`Comp.Scoring.ParticipantScoringStatus.Dnf` was deliberately left alone — it's an
+internal scoring-domain enum that never reaches the API or a screen, so renaming it would only add
+diff with no user-visible effect.)
+
+- The column is stored as text (`EventResultConfiguration`'s `HasConversion<string>()`), so a
+  rename alone would silently orphan every already-finalised event's existing "Dnf" rows — EF's
+  own migration diffing never catches an enum member rename (it only tracks the CLR type and
+  conversion, not member names), so `dotnet ef migrations add` produced an empty migration that
+  needed a manual `UPDATE event_results SET status = 'DNF' WHERE status = 'Dnf'` added by hand
+  (migration `UppercaseDnfStatus`). Verified against the local dev database directly (`docker exec
+  comp-db psql`) before and after: 40 existing DNF rows, all correctly rewritten.
+- This migration reaches staging automatically on the next deploy — `render.yaml` sets
+  `RunMigrationsOnStartup: true`, so the API applies any pending migration (including this one) on
+  every boot, no manual step needed.
+- Fixed the two matching frontend checks in `lib/resultsPdf.tsx` (`p.status === "Dnf"` →
+  `"DNF"`, used to decide DNF row styling and hide the position number) to match the new value.
+- Verified: `dotnet test` (backend, 91 API tests + 21 scoring tests, all still green — no test
+  asserted the literal old string) and the local database check above.
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 

@@ -16,7 +16,7 @@ public class EventResult
     public Guid? LeagueId { get; set; }
     public Guid? BestRunId { get; set; }
     public int? EventTimeMs { get; set; }
-    public EventResultStatus Status { get; set; } = EventResultStatus.Dnf;
+    public EventResultStatus Status { get; set; } = EventResultStatus.DNF;
     public int? OverallPosition { get; set; }
     public int? LeaguePosition { get; set; }
     public int LeaguePoints { get; set; } = 0;
