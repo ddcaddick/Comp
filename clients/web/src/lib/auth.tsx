@@ -5,7 +5,10 @@ import { decodeJwtPayload } from "./jwt";
 export interface CurrentUser {
   displayName: string;
   email: string;
+  role: string | null;
 }
+
+const ROLE_CLAIM = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
 
 interface AuthContextValue {
   isAuthenticated: boolean;
@@ -24,7 +27,8 @@ function userFromAccessToken(accessToken: string | null): CurrentUser | null {
   const displayName = payload?.display_name;
   const email = payload?.email;
   if (typeof displayName !== "string" || typeof email !== "string") return null;
-  return { displayName, email };
+  const role = payload?.[ROLE_CLAIM];
+  return { displayName, email, role: typeof role === "string" ? role : null };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

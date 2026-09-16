@@ -79,6 +79,7 @@ builder.Services
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddScoped<JwtAccessTokenGenerator>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IShooterService, ShooterService>();
 builder.Services.AddScoped<ICompetitionService, CompetitionService>();
 builder.Services.AddScoped<ILeagueService, LeagueService>();
@@ -201,6 +202,7 @@ app.MapGet("/health", () => Results.Ok(new
 }));
 
 app.MapAuthEndpoints();
+app.MapUserEndpoints();
 app.MapShooterEndpoints();
 app.MapCompetitionEndpoints();
 app.MapLeagueEndpoints();
