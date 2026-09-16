@@ -99,6 +99,34 @@ public class SquadService(CompDbContext dbContext) : ISquadService
         return new SquadResult.Success(ToResponse(squad));
     }
 
+    public async Task<SquadResult> ReopenAsync(Guid eventId, Guid squadId, CancellationToken cancellationToken)
+    {
+        var @event = await dbContext.Events.FindAsync([eventId], cancellationToken);
+        if (@event is null)
+        {
+            return new SquadResult.NotFound();
+        }
+
+        if (@event.Status == EventStatus.Finalised)
+        {
+            return new SquadResult.Conflict("Cannot change squads on a finalised event.");
+        }
+
+        var squad = await dbContext.Squads.SingleOrDefaultAsync(s => s.Id == squadId && s.EventId == eventId, cancellationToken);
+        if (squad is null)
+        {
+            return new SquadResult.NotFound();
+        }
+
+        if (squad.Status != SquadStatus.Pending)
+        {
+            squad.Status = SquadStatus.Pending;
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        return new SquadResult.Success(ToResponse(squad));
+    }
+
     private static SquadResponse ToResponse(Squad squad) =>
         new(squad.Id, squad.SquadNumber, squad.Name, squad.Status.ToString());
 }

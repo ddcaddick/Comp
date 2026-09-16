@@ -96,6 +96,20 @@ export default function SquadListScreen() {
     onError: (err: Error) => setError(err.message),
   });
 
+  const reopenSquad = useMutation({
+    mutationFn: async (squadId: string) => {
+      const { error } = await api.POST("/events/{id}/squads/{squadId}/reopen", {
+        params: { path: { id: eventId, squadId } },
+      });
+      if (error) throw new Error(errorDetail(error, "Could not amend this squad."));
+    },
+    onSuccess: () => {
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ["squads", eventId] });
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
   const session = sessionQuery.data;
   const minutesAgo = session?.lastSeenAt
     ? Math.round((Date.now() - new Date(session.lastSeenAt).getTime()) / 60_000)
@@ -151,6 +165,7 @@ export default function SquadListScreen() {
       {squadsQuery.isError && <Text style={styles.error}>Could not load squads.</Text>}
 
       <FlatList
+        style={styles.listContainer}
         data={squads}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
@@ -203,7 +218,15 @@ export default function SquadListScreen() {
                   {count} shooter{count === 1 ? "" : "s"} · {isAllocated ? "Allocated" : "Pending"}
                 </Text>
               </Pressable>
-              {!isAllocated && (
+              {isAllocated ? (
+                <Pressable
+                  style={styles.amendButton}
+                  disabled={reopenSquad.isPending}
+                  onPress={() => reopenSquad.mutate(item.id)}
+                >
+                  <Text style={styles.amendButtonText}>Amend</Text>
+                </Pressable>
+              ) : (
                 <Pressable
                   style={styles.completeButton}
                   disabled={completeSquad.isPending}
@@ -246,6 +269,7 @@ const styles = StyleSheet.create({
   },
   actionButtonText: { fontFamily: fonts.bold, fontSize: 13, color: colors.accent },
   spinner: { marginTop: 24 },
+  listContainer: { flex: 1 },
   list: { gap: 8, paddingBottom: 24 },
   unassignedSection: { marginBottom: 16, gap: 8 },
   sectionLabel: {
@@ -285,6 +309,9 @@ const styles = StyleSheet.create({
   rowSubtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.textSecondary, marginTop: 4 },
   completeButton: {
     marginRight: 14,
+    minWidth: 92,
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 7,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -292,6 +319,18 @@ const styles = StyleSheet.create({
     borderColor: colors.warning,
   },
   completeButtonText: { fontFamily: fonts.monoBold, fontSize: 11, color: colors.warning },
+  amendButton: {
+    marginRight: 14,
+    minWidth: 92,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  amendButtonText: { fontFamily: fonts.monoBold, fontSize: 11, color: colors.error },
   error: { color: colors.errorText, fontFamily: fonts.body, marginTop: 16 },
   empty: { textAlign: "center", color: colors.textSecondary, fontFamily: fonts.body, marginTop: 40 },
 });
