@@ -126,6 +126,37 @@ public class ResultsEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_participant_with_no_runs_recorded_shows_as_not_run_rather_than_dnf()
+    {
+        var (@event, faster, slower) = await SetUpEventInReviewAsync(30, fasterMs: 90_000, slowerMs: 95_000);
+
+        // Added after the event was already advanced through Setup/InProgress/Review by
+        // SetUpEventInReviewAsync, mirroring a shooter who simply never got called up —
+        // never had a run entered for them at all, as opposed to one who was up and DNF'd.
+        var neverUpShooter = await CreateShooterAsync("NeverUp", "Shooter");
+        await _superAdmin.PutAsJsonAsync($"/leagues/{_leagueId}/members",
+            new { shooterIds = new[] { faster.ShooterId, slower.ShooterId, neverUpShooter.Id } });
+        var neverUp = await AddParticipantAsync(@event.Id, neverUpShooter.Id);
+
+        var live = await GetResultsAsync(@event.Id);
+        var liveNeverUp = live!.Participants.Single(p => p.ParticipantId == neverUp.Id);
+        Assert.Equal("NotRun", liveNeverUp.Status);
+        Assert.Null(liveNeverUp.EventTimeMs);
+        Assert.Null(liveNeverUp.OverallPosition);
+        Assert.Null(liveNeverUp.LeaguePosition);
+
+        var finalise = await _admin.PostAsJsonAsync($"/events/{@event.Id}/transition", new { to = "Finalised" });
+        finalise.EnsureSuccessStatusCode();
+
+        var frozen = await GetResultsAsync(@event.Id);
+        var frozenNeverUp = frozen!.Participants.Single(p => p.ParticipantId == neverUp.Id);
+        Assert.Equal("NotRun", frozenNeverUp.Status);
+        Assert.Null(frozenNeverUp.EventTimeMs);
+        Assert.Null(frozenNeverUp.OverallPosition);
+        Assert.Null(frozenNeverUp.LeaguePosition);
+    }
+
+    [Fact]
     public async Task Finalising_computes_correct_overall_and_league_points()
     {
         var (@event, faster, slower) = await SetUpEventInReviewAsync(2, fasterMs: 90_000, slowerMs: 95_000);

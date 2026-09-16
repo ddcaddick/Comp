@@ -26,6 +26,37 @@ public class EventScorerTests
     }
 
     [Fact]
+    public void No_runs_recorded_at_all_is_not_run_rather_than_dnf()
+    {
+        var leagueId = Guid.NewGuid();
+        var leagueRules = new Dictionary<Guid, LeagueRules> { [leagueId] = new(50, 1, 0, true) };
+        var neverUp = new ParticipantInput(Guid.NewGuid(), leagueId, []);
+
+        var score = EventScorer.Score([neverUp], Rules, leagueRules).Participants.Single();
+
+        Assert.Equal(ParticipantScoringStatus.NotRun, score.Status);
+        Assert.Null(score.EventTimeMs);
+        Assert.Null(score.OverallPosition);
+        Assert.Null(score.LeaguePosition);
+        Assert.Equal(0, score.LeaguePoints);
+    }
+
+    [Fact]
+    public void A_single_recorded_dnf_with_the_other_run_still_outstanding_is_dnf_not_not_run()
+    {
+        // Only run 1 has been entered so far (run 2 hasn't happened yet), and it was
+        // marked DNF -- this participant has genuinely been up, so they're Dnf, not
+        // NotRun, even though a valid time still isn't in yet either.
+        var leagueId = Guid.NewGuid();
+        var leagueRules = new Dictionary<Guid, LeagueRules> { [leagueId] = new(50, 1, 0, true) };
+        var participant = new ParticipantInput(Guid.NewGuid(), leagueId, [new RunInput(1, null, 0, true)]);
+
+        var score = EventScorer.Score([participant], Rules, leagueRules).Participants.Single();
+
+        Assert.Equal(ParticipantScoringStatus.Dnf, score.Status);
+    }
+
+    [Fact]
     public void One_dnf_plus_one_valid_run_the_valid_run_stands()
     {
         var leagueId = Guid.NewGuid();

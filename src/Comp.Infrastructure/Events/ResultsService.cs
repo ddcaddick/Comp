@@ -64,7 +64,12 @@ public class ResultsService(CompDbContext dbContext) : IResultsService
                 LeagueId = score.LeagueId,
                 BestRunId = bestRunId,
                 EventTimeMs = score.EventTimeMs,
-                Status = score.Status == ParticipantScoringStatus.Ranked ? EventResultStatus.Ranked : EventResultStatus.DNF,
+                Status = score.Status switch
+                {
+                    ParticipantScoringStatus.Ranked => EventResultStatus.Ranked,
+                    ParticipantScoringStatus.NotRun => EventResultStatus.NotRun,
+                    _ => EventResultStatus.DNF
+                },
                 OverallPosition = score.OverallPosition,
                 LeaguePosition = score.LeaguePosition,
                 LeaguePoints = score.LeaguePoints,

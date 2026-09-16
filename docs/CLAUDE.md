@@ -1338,6 +1338,54 @@ slots, rendering an equally-sized empty placeholder `div` when the button itself
 so every row's Edit/Delete (or Deactivate/Reactivate) column lines up in exactly the same place
 regardless of that row's own status.
 
+**Event results page now polls live, every 5 seconds, per explicit user direction** — the
+league/overall results screen (`EventResultsPage.tsx`) is meant to be left open on a display
+during live entry and update on its own as scores come in, without anyone refreshing it by hand.
+Implemented as a `refetchInterval` on the existing `resultsQuery` (`(query) =>
+query.state.data?.isFinal ? false : 5000`) — polling stops automatically once the event is
+finalised, since a frozen result never changes again. Deliberately left the separate
+`overallResultsQuery` (used only on-demand, to generate the PDF) non-polling — nothing there
+needs to update while no one's looking at it. Pure client-side change: same endpoint, same
+hosting, no new infrastructure, no server load beyond one admin client's browser asking five
+times as often — confirmed this explicitly since the user asked directly whether it would affect
+render or hosting.
+
+**Split "DNF" into two distinct statuses — `Dnf` and `NotRun` — per explicit user direction**:
+"that status should only be for shooters who have actually had a DNF clicked on the timing
+screen. Shooters with no time entered yet should show as Not Run." Previously
+`EventScorer.ComputeAdjustedTimes` collapsed both "at least one run explicitly marked DNF, none
+valid" and "literally zero runs recorded for this participant" into the same `EventTimeMs =
+null` outcome, displayed everywhere as "DNF" — including for a shooter who simply hasn't been
+called up yet.
+
+- Added `ParticipantScoringStatus.NotRun` (`Comp.Scoring`) and `EventResultStatus.NotRun`
+  (`Comp.Domain.Enums`), alongside the existing `Dnf`/`DNF`. `EventScorer`'s internal
+  `ScoredParticipant` record gained a `HasNoRuns` bool (`participant.Runs.Count == 0`, computed
+  in `ComputeAdjustedTimes`), which `ToParticipantScore` uses to pick `NotRun` vs `Dnf` whenever
+  `EventTimeMs` is null. `ResultsService.RecalculateAndPersistAsync`'s status mapping changed
+  from a two-way ternary to a three-way switch over the same values.
+- Migration `AddNotRunStatus`: as with the earlier `UppercaseDnfStatus` migration, an
+  enum-member-only change produces an **empty** model diff (EF's migration diff tracks the CLR
+  type/conversion, not enum member names) — the migration is entirely a manual backfill,
+  reclassifying any already-frozen `event_results` row as `NotRun` where its status is `DNF` and
+  it has zero `runs` rows at all. Applied and verified against the local dev database (no rows
+  needed reclassifying in that dataset — expected, since it's synthetic and every entered
+  participant there has at least one run).
+- Frontend: added `clients/web/src/lib/resultStatus.ts` (`formatResultStatus`, mapping `"NotRun"`
+  → `"Not Run"` and passing everything else through unchanged) shared between
+  `EventResultsPage.tsx`'s on-screen table and `resultsPdf.tsx`. Both places that used to special-
+  case `p.status === "DNF"` (to suppress the position number and apply the muted/italic style) now
+  check `p.status !== "Ranked"` instead, so `NotRun` gets the same "no position, muted" treatment
+  as `Dnf` rather than looking like a ranked result.
+- Tested: two new `EventScorerTests` cases (a participant with zero runs at all → `NotRun`; a
+  participant with one run explicitly marked DNF and a second run still outstanding → `Dnf`, not
+  `NotRun` — proving "at least one run recorded" is the actual dividing line, regardless of runs
+  still to come) — `Comp.Scoring.Tests` now 23/23. One new
+  `ResultsEndpointTests` case adds a third participant with no runs at all to an otherwise-normal
+  event and asserts `"NotRun"` through the real `/events/{id}/results` endpoint, both live
+  (pre-finalisation) and frozen (post-finalisation) — full suite now 130/130 (107 API + 23
+  Scoring).
+
 Not yet built: M9 (hardening) and the actual EAS Android build and store submission (M10,
 per D11).
 

@@ -68,10 +68,12 @@ public static class EventScorer
     {
         if (w.EventTimeMs is null)
         {
-            // Both DNF, or no runs at all: listed in the results table, unranked, zero
-            // league points — never a position anywhere, overall or league.
-            return new ParticipantScore(w.ParticipantId, w.LeagueId, ParticipantScoringStatus.Dnf,
-                null, null, null, null, 0);
+            // Either way, listed in the results table, unranked, zero league points —
+            // never a position anywhere, overall or league. Distinguished only for
+            // display: NotRun means nothing has been recorded for them yet; Dnf means
+            // at least one run was actually marked DNF on the entry screen.
+            var status = w.HasNoRuns ? ParticipantScoringStatus.NotRun : ParticipantScoringStatus.Dnf;
+            return new ParticipantScore(w.ParticipantId, w.LeagueId, status, null, null, null, null, 0);
         }
 
         return new ParticipantScore(
@@ -96,7 +98,11 @@ public static class EventScorer
         if (adjustedByRun.Count == 0)
         {
             // Both DNF, or an empty run list — either way, no valid run to rank on.
-            return new ScoredParticipant(participant.ParticipantId, participant.LeagueId, null, null, null);
+            // HasNoRuns (literally zero runs recorded, as opposed to one or more
+            // explicitly marked DNF) is what tells ToParticipantScore which of those two
+            // this actually was.
+            return new ScoredParticipant(
+                participant.ParticipantId, participant.LeagueId, null, null, null, participant.Runs.Count == 0);
         }
 
         var best = adjustedByRun[0];
@@ -105,7 +111,7 @@ public static class EventScorer
         int? otherRunAdjusted = adjustedByRun.Count > 1 ? adjustedByRun[1].Adjusted : null;
 
         return new ScoredParticipant(
-            participant.ParticipantId, participant.LeagueId, best.Adjusted, otherRunAdjusted, best.RunNumber);
+            participant.ParticipantId, participant.LeagueId, best.Adjusted, otherRunAdjusted, best.RunNumber, false);
     }
 
     private static int? ComputeAdjusted(RunInput run, EventRules rules)
@@ -177,5 +183,6 @@ public static class EventScorer
         Guid? LeagueId,
         int? EventTimeMs,
         int? OtherRunAdjustedMs,
-        int? BestRunNumber);
+        int? BestRunNumber,
+        bool HasNoRuns);
 }
