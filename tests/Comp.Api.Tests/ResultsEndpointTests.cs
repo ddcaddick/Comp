@@ -284,6 +284,7 @@ public class ResultsEndpointTests : IAsyncLifetime
 
         var standingsResponse = await _admin.GetFromJsonAsync<LeagueStandingsResponse>($"/leagues/{leagueId}/standings");
         Assert.Equal(2, standingsResponse!.EventsHeld);
+        Assert.Equal(2, standingsResponse.DropWorstCount);
         // D7: provisional stays true while eventsHeld <= dropWorstCount (2 <= 2 here) — a
         // 3rd event would push eventsHeld past dropWorstCount and start dropping.
         Assert.All(standingsResponse.Standings, s => Assert.True(s.IsProvisional));

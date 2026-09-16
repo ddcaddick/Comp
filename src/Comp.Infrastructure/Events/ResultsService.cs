@@ -141,7 +141,8 @@ public class ResultsService(CompDbContext dbContext) : IResultsService
             s.MissedEvents,
             s.IsProvisional)).ToList();
 
-        return new LeagueStandingsResult.Success(new LeagueStandingsResponse(league.Id, league.Name, eventsHeld, response));
+        return new LeagueStandingsResult.Success(
+            new LeagueStandingsResponse(league.Id, league.Name, eventsHeld, league.DropWorstCount, response));
     }
 
     private async Task<List<EventParticipantResultResponse>> ComputeLiveAsync(Event @event, CancellationToken cancellationToken)
