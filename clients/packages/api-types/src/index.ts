@@ -2226,6 +2226,12 @@ export interface components {
             /** Format: date */
             endsOn: string;
             status: string;
+            /** Format: int32 */
+            totalShooters: number | string;
+            /** Format: double */
+            averageShootersPerEvent: number | string;
+            /** Format: int32 */
+            eventsRemaining: number | string;
         };
         CreateCompetitionRequest: {
             name: string;

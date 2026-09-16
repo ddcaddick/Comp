@@ -30,7 +30,7 @@ public class CompetitionService(CompDbContext dbContext) : ICompetitionService
         dbContext.Competitions.Add(competition);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return new CompetitionResult.Success(ToResponse(competition));
+        return new CompetitionResult.Success(await ToResponseAsync(competition, cancellationToken));
     }
 
     public async Task<IReadOnlyList<CompetitionResponse>> ListAsync(CancellationToken cancellationToken)
@@ -40,7 +40,35 @@ public class CompetitionService(CompDbContext dbContext) : ICompetitionService
             .ThenBy(c => c.Name)
             .ToListAsync(cancellationToken);
 
-        return competitions.Select(ToResponse).ToList();
+        var competitionIds = competitions.Select(c => c.Id).ToList();
+
+        var events = await dbContext.Events
+            .Where(e => competitionIds.Contains(e.CompetitionId))
+            .ToListAsync(cancellationToken);
+        var eventIds = events.Select(e => e.Id).ToList();
+
+        var participants = await dbContext.EventParticipants
+            .Where(p => eventIds.Contains(p.EventId))
+            .ToListAsync(cancellationToken);
+        var participantIds = participants.Select(p => p.Id).ToList();
+
+        // "Shot" means at least one run exists for that participant, DNF or not -- the
+        // same Shot/NotRun distinction the mobile squad list's stats bar uses (see
+        // Comp.Scoring's ParticipantScoringStatus.NotRun). Someone only ever added to a
+        // roster and never called up doesn't count as having shot the competition.
+        var shotParticipantIds = (await dbContext.Runs
+                .Where(r => participantIds.Contains(r.EventParticipantId))
+                .Select(r => r.EventParticipantId)
+                .Distinct()
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        var eventsByCompetition = events.ToLookup(e => e.CompetitionId);
+        var participantsByEvent = participants.ToLookup(p => p.EventId);
+
+        return competitions
+            .Select(c => BuildResponse(c, eventsByCompetition[c.Id], participantsByEvent, shotParticipantIds))
+            .ToList();
     }
 
     public async Task<CompetitionResult> CloseAsync(Guid id, CancellationToken cancellationToken)
@@ -59,14 +87,79 @@ public class CompetitionService(CompDbContext dbContext) : ICompetitionService
         competition.Status = CompetitionStatus.Closed;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return new CompetitionResult.Success(ToResponse(competition));
+        return new CompetitionResult.Success(await ToResponseAsync(competition, cancellationToken));
     }
 
-    private static CompetitionResponse ToResponse(Competition competition) => new(
-        competition.Id,
-        competition.Name,
-        competition.Year,
-        competition.StartsOn,
-        competition.EndsOn,
-        competition.Status.ToString());
+    // Used by CreateAsync/CloseAsync, which each handle a single competition -- ListAsync
+    // has its own batched version of this same query shape to avoid N+1 round trips.
+    private async Task<CompetitionResponse> ToResponseAsync(Competition competition, CancellationToken cancellationToken)
+    {
+        var events = await dbContext.Events
+            .Where(e => e.CompetitionId == competition.Id)
+            .ToListAsync(cancellationToken);
+        var eventIds = events.Select(e => e.Id).ToList();
+
+        var participants = await dbContext.EventParticipants
+            .Where(p => eventIds.Contains(p.EventId))
+            .ToListAsync(cancellationToken);
+        var participantIds = participants.Select(p => p.Id).ToList();
+
+        var shotParticipantIds = (await dbContext.Runs
+                .Where(r => participantIds.Contains(r.EventParticipantId))
+                .Select(r => r.EventParticipantId)
+                .Distinct()
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        return BuildResponse(competition, events, participants.ToLookup(p => p.EventId), shotParticipantIds);
+    }
+
+    private static CompetitionResponse BuildResponse(
+        Competition competition,
+        IEnumerable<Event> competitionEvents,
+        ILookup<Guid, EventParticipant> participantsByEvent,
+        HashSet<Guid> shotParticipantIds)
+    {
+        var eventsList = competitionEvents.ToList();
+
+        var shooterIdsWhoShot = new HashSet<Guid>();
+        var perEventShooterCounts = new List<int>();
+        foreach (var @event in eventsList)
+        {
+            var shootersThisEvent = new HashSet<Guid>();
+            foreach (var participant in participantsByEvent[@event.Id])
+            {
+                if (!shotParticipantIds.Contains(participant.Id))
+                {
+                    continue;
+                }
+
+                shootersThisEvent.Add(participant.ShooterId);
+                shooterIdsWhoShot.Add(participant.ShooterId);
+            }
+
+            // Only an event that actually had someone shoot counts towards the average --
+            // a future, empty week would otherwise drag it down for no reason.
+            if (shootersThisEvent.Count > 0)
+            {
+                perEventShooterCounts.Add(shootersThisEvent.Count);
+            }
+        }
+
+        var averagePerEvent = perEventShooterCounts.Count > 0
+            ? Math.Round((decimal)perEventShooterCounts.Sum() / perEventShooterCounts.Count, 1)
+            : 0m;
+        var eventsRemaining = eventsList.Count(e => e.Status != EventStatus.Finalised);
+
+        return new CompetitionResponse(
+            competition.Id,
+            competition.Name,
+            competition.Year,
+            competition.StartsOn,
+            competition.EndsOn,
+            competition.Status.ToString(),
+            shooterIdsWhoShot.Count,
+            averagePerEvent,
+            eventsRemaining);
+    }
 }
