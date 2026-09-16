@@ -36,38 +36,43 @@ export function LeagueStandingsPage() {
       {standingsQuery.isError && <p className="text-sm text-destructive">Could not load standings.</p>}
 
       {!standingsQuery.isLoading && !standingsQuery.isError && (
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border text-left">
-              <th className="py-2 pr-4 font-medium text-muted-foreground">Pos</th>
-              <th className="py-2 pr-4 font-medium text-muted-foreground">Name</th>
-              <th className="py-2 pr-4 font-medium text-muted-foreground">Counting</th>
-              <th className="py-2 pr-4 font-medium text-muted-foreground">Missed</th>
-              <th className="py-2 pr-4 font-medium text-muted-foreground">Running total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(standingsQuery.data?.standings ?? []).map((s) => (
-              <tr key={s.shooterId} className="border-b border-border">
-                <td className="py-2 pr-4">{s.position}</td>
-                <td className="py-2 pr-4">
-                  <ShooterName shooter={s} />
-                  {s.isProvisional && <span className="ml-2 text-xs text-muted-foreground">(provisional)</span>}
-                </td>
-                <td className="py-2 pr-4">{s.countingTotal}</td>
-                <td className="py-2 pr-4">{s.missedEvents}</td>
-                <td className="py-2 pr-4">{s.runningTotal}</td>
+        <>
+          {!!standingsQuery.data?.dropWorstCount && (
+            <p className="mb-2 text-sm text-primary">
+              This includes your lowest {standingsQuery.data.dropWorstCount} scores removed.
+            </p>
+          )}
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-border text-left">
+                <th className="py-2 pr-4 font-medium text-muted-foreground">Pos</th>
+                <th className="py-2 pr-4 font-medium text-muted-foreground">Name</th>
+                <th className="py-2 pr-4 font-medium text-muted-foreground">Dropped</th>
+                <th className="py-2 pr-4 font-medium text-muted-foreground">Points</th>
               </tr>
-            ))}
-            {(standingsQuery.data?.standings ?? []).length === 0 && (
-              <tr>
-                <td colSpan={5} className="py-4 text-center text-muted-foreground">
-                  No events have been finalised for this league yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {(standingsQuery.data?.standings ?? []).map((s) => (
+                <tr key={s.shooterId} className="border-b border-border">
+                  <td className="py-2 pr-4">{s.position}</td>
+                  <td className="py-2 pr-4">
+                    <ShooterName shooter={s} />
+                    {s.isProvisional && <span className="ml-2 text-xs text-muted-foreground">(provisional)</span>}
+                  </td>
+                  <td className="py-2 pr-4">{s.missedEvents}</td>
+                  <td className="py-2 pr-4">{s.countingTotal}</td>
+                </tr>
+              ))}
+              {(standingsQuery.data?.standings ?? []).length === 0 && (
+                <tr>
+                  <td colSpan={4} className="py-4 text-center text-muted-foreground">
+                    No events have been finalised for this league yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </>
       )}
     </div>
   );

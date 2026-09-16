@@ -2415,6 +2415,8 @@ export interface components {
             leagueName: string;
             /** Format: int32 */
             eventsHeld: number | string;
+            /** Format: int32 */
+            dropWorstCount: number | string;
             standings: components["schemas"]["LeagueStandingResponse"][];
         };
         LoginRequest: {
