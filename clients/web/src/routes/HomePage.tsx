@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
-import { CalendarDays, ChevronRight, History } from "lucide-react";
+import { Activity, CalendarDays, ChevronRight, History } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { addDaysIso, todayIso } from "../lib/dates";
@@ -35,6 +35,12 @@ export function HomePage() {
   const recentStart = addDaysIso(today, -14);
 
   const events = eventsQuery.data ?? [];
+  // Not date-windowed like the sections below -- an event left InProgress is worth
+  // surfacing regardless of when it started, since that's exactly the "someone forgot to
+  // finalise this" case an admin most needs to notice.
+  const inProgress = events
+    .filter((e) => e.status === "InProgress")
+    .sort((a, b) => a.eventDate.localeCompare(b.eventDate));
   const upcoming = events
     .filter((e) => e.eventDate >= today && e.eventDate <= upcomingEnd)
     .sort((a, b) => a.eventDate.localeCompare(b.eventDate));
@@ -62,26 +68,40 @@ export function HomePage() {
       {!isLoading && eventsQuery.isError && <p className="text-sm text-destructive">Could not load events.</p>}
 
       {!isLoading && !eventsQuery.isError && (
-        <div className="grid gap-8 md:grid-cols-2">
-          <EventSection
-            icon={<CalendarDays className="h-4 w-4" />}
-            title="Upcoming Events"
-            subtitle="Next 7 days"
-            events={upcoming}
-            competitionNameById={competitionNameById}
-            emptyText="No events in the next 7 days."
-            onSelect={goToEvent}
-          />
-          <EventSection
-            icon={<History className="h-4 w-4" />}
-            title="Recent Events"
-            subtitle="Last 14 days"
-            events={recent}
-            competitionNameById={competitionNameById}
-            emptyText="No events in the last 14 days."
-            onSelect={goToEvent}
-          />
-        </div>
+        <>
+          <div className="mb-8">
+            <EventSection
+              icon={<Activity className="h-4 w-4" />}
+              title="In Progress"
+              subtitle="Happening right now"
+              events={inProgress}
+              competitionNameById={competitionNameById}
+              emptyText="No events in progress."
+              onSelect={goToEvent}
+            />
+          </div>
+
+          <div className="grid gap-8 md:grid-cols-2">
+            <EventSection
+              icon={<CalendarDays className="h-4 w-4" />}
+              title="Upcoming Events"
+              subtitle="Next 7 days"
+              events={upcoming}
+              competitionNameById={competitionNameById}
+              emptyText="No events in the next 7 days."
+              onSelect={goToEvent}
+            />
+            <EventSection
+              icon={<History className="h-4 w-4" />}
+              title="Recent Events"
+              subtitle="Last 14 days"
+              events={recent}
+              competitionNameById={competitionNameById}
+              emptyText="No events in the last 14 days."
+              onSelect={goToEvent}
+            />
+          </div>
+        </>
       )}
     </div>
   );
