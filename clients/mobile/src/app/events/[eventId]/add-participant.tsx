@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "@/lib/api";
-import { preferredName } from "@/lib/shooterName";
+import { preferredName, preferredNameSortKey } from "@/lib/shooterName";
 import { colors, fonts } from "@/lib/theme";
 
 function errorDetail(error: unknown, fallback: string): string {
@@ -41,6 +41,12 @@ export default function AddParticipantScreen() {
     },
   });
   const addedShooterIds = new Set((participantsQuery.data ?? []).map((p) => p.shooterId));
+
+  // Sorted by whatever preferredName actually displays (nickname when set, surname
+  // otherwise), not always by surname -- see preferredNameSortKey.
+  const sortedShooters = [...(shootersQuery.data ?? [])].sort((a, b) =>
+    preferredNameSortKey(a).localeCompare(preferredNameSortKey(b)),
+  );
 
   const addMutation = useMutation({
     mutationFn: async (shooterId: string) => {
@@ -100,7 +106,7 @@ export default function AddParticipantScreen() {
       {shootersQuery.isLoading && <ActivityIndicator color={colors.accent} style={styles.spinner} />}
 
       <ScrollView contentContainerStyle={styles.list}>
-        {(shootersQuery.data ?? []).map((shooter) => {
+        {sortedShooters.map((shooter) => {
           const isAdded = addedShooterIds.has(shooter.id);
           return (
             <View key={shooter.id} style={styles.row}>
@@ -119,7 +125,7 @@ export default function AddParticipantScreen() {
             </View>
           );
         })}
-        {!shootersQuery.isLoading && (shootersQuery.data ?? []).length === 0 && (
+        {!shootersQuery.isLoading && sortedShooters.length === 0 && (
           <Text style={styles.empty}>No matching shooters.</Text>
         )}
 

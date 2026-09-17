@@ -11,3 +11,14 @@ interface NamedShooter {
 export function preferredName(shooter: NamedShooter): string {
   return shooter.nickname?.trim() ? shooter.nickname : `${shooter.firstName} ${shooter.lastName}`;
 }
+
+/**
+ * Sorting a list of shooters by surname stops making sense once nicknames are shown
+ * instead -- "Aron Chatwin" filed under C reads oddly next to his own displayed name,
+ * "Azza". This key sorts on whatever preferredName would actually display: the
+ * nickname when there is one, and the surname (not the full "First Last" string)
+ * otherwise, per explicit user direction.
+ */
+export function preferredNameSortKey(shooter: NamedShooter): string {
+  return (shooter.nickname?.trim() ? shooter.nickname : shooter.lastName).toLowerCase();
+}
