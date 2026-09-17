@@ -23,6 +23,17 @@ const KEYPAD_ROWS = [
   ["", "0", "back"],
 ];
 
+// This screen is built for firing off consecutive times as fast as possible, so it must
+// never need a scroll to reach Save -- a short device (an Xperia XZ1's ~724dp, say) simply
+// doesn't have room for the full-size layout below the header. MIN/MAX bound how far the
+// fit-to-screen scale below can shrink or grow it, so text stays legible on a tiny screen
+// and doesn't balloon absurdly on a tall one.
+const MIN_SCALE = 0.72;
+const MAX_SCALE = 1.15;
+// Below this, a key/button stops shrinking with everything else -- Android's own minimum
+// recommended touch target -- since a smaller screen is exactly when mis-taps hurt most.
+const MIN_TOUCH_TARGET = 44;
+
 export default function EntryScreen() {
   const params = useLocalSearchParams<{
     eventId: string;
@@ -40,6 +51,26 @@ export default function EntryScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+
+  // Fit-to-screen: containerHeight is the space actually available below the header;
+  // contentHeight is this content's own natural (scale 1) height, captured once on first
+  // layout and never overwritten again -- otherwise, once a computed scale changed the
+  // rendered size, the next layout pass would measure the *scaled* height instead of the
+  // natural one and chase a moving target. Comparing the two gives exactly the factor
+  // needed to make the content fill the screen without scrolling (or, on a tall screen,
+  // stretch a bit to use the extra room) -- clamped so it never shrinks past legibility or
+  // grows past sensible.
+  const [containerHeight, setContainerHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const hasMeasuredContent = useRef(false);
+
+  const scale =
+    containerHeight > 0 && contentHeight > 0
+      ? Math.min(MAX_SCALE, Math.max(MIN_SCALE, containerHeight / contentHeight))
+      : 1;
+  const s = (value: number) => Math.round(value * scale);
+  const penaltyButtonSize = Math.max(MIN_TOUCH_TARGET, s(48));
+  const keypadKeyHeight = Math.max(MIN_TOUCH_TARGET, s(56));
 
   const runNumber = Number(params.runNumber);
   const displayName = preferredName({ firstName: params.firstName, lastName: params.lastName, nickname: params.nickname });
@@ -179,80 +210,114 @@ export default function EntryScreen() {
   const displayTime = isDnf ? "DNF" : formatMillis(digitsToMillis(digits));
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}>
       <Stack.Screen options={{ headerShown: true, title: `Run ${runNumber}` }} />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.name}>{displayName}</Text>
-        {previousSummary && <Text style={styles.previous}>Previously: {previousSummary}</Text>}
-
-        <Text style={[styles.timeDisplay, isDnf && styles.timeDisplayDnf]}>{displayTime}</Text>
-
-        <Pressable style={[styles.dnfButton, isDnf && styles.dnfButtonActive]} onPress={handleToggleDnf}>
-          <Text style={[styles.dnfButtonText, isDnf && styles.dnfButtonTextActive]}>
-            {isDnf ? "DNF — tap to undo" : "Mark DNF"}
-          </Text>
-        </Pressable>
-
-        <View style={styles.penaltyRow}>
-          <Pressable
-            style={styles.penaltyButton}
-            disabled={penaltyCount === 0}
-            onPress={() => setPenaltyCount((count) => Math.max(0, count - 1))}
-          >
-            <Text style={styles.penaltyButtonText}>−</Text>
-          </Pressable>
-          <View style={styles.penaltyCountBox}>
-            <Text style={styles.penaltyCount}>{penaltyCount}</Text>
-            <Text style={styles.penaltyLabel}>penalties</Text>
-          </View>
-          <Pressable
-            style={styles.penaltyButton}
-            disabled={penaltyCount === MAX_PENALTIES}
-            onPress={() => setPenaltyCount((count) => Math.min(MAX_PENALTIES, count + 1))}
-          >
-            <Text style={styles.penaltyButtonText}>+</Text>
-          </Pressable>
-          <Pressable
-            style={styles.penaltyChip}
-            disabled={penaltyCount === MAX_PENALTIES}
-            onPress={() => setPenaltyCount((count) => Math.min(MAX_PENALTIES, count + 5))}
-          >
-            <Text style={styles.penaltyChipText}>+5</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.keypad}>
-          {KEYPAD_ROWS.map((row, rowIndex) => (
-            <View key={rowIndex} style={styles.keypadRow}>
-              {row.map((key, keyIndex) =>
-                key === "" ? (
-                  <View key={keyIndex} style={styles.keypadKey} />
-                ) : (
-                  <Pressable
-                    key={keyIndex}
-                    style={styles.keypadKey}
-                    disabled={isDnf}
-                    onPress={() => handleKeyPress(key)}
-                  >
-                    <Text style={styles.keypadKeyText}>{key === "back" ? "⌫" : key}</Text>
-                  </Pressable>
-                ),
-              )}
-            </View>
-          ))}
-        </View>
-
-        {saveError && <Text style={styles.error}>{saveError}</Text>}
-        {lastSaved && !saveError && <Text style={styles.lastSaved}>Saved {lastSaved} ✓</Text>}
-
-        <Pressable
-          style={[styles.saveButton, { marginBottom: 24 + insets.bottom }, !canSave && styles.saveButtonDisabled]}
-          disabled={!canSave || saveMutation.isPending}
-          onPress={handleSave}
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingTop: s(16) }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View
+          onLayout={(e) => {
+            if (!hasMeasuredContent.current) {
+              hasMeasuredContent.current = true;
+              setContentHeight(e.nativeEvent.layout.height);
+            }
+          }}
         >
-          <Text style={styles.saveButtonText}>{saveMutation.isPending ? "Saving…" : "Save"}</Text>
-        </Pressable>
+          <Text style={[styles.name, { fontSize: s(30) }]}>{displayName}</Text>
+          {previousSummary && (
+            <Text style={[styles.previous, { marginTop: s(4) }]}>Previously: {previousSummary}</Text>
+          )}
+
+          <Text
+            style={[styles.timeDisplay, isDnf && styles.timeDisplayDnf, { fontSize: s(56), marginVertical: s(20) }]}
+          >
+            {displayTime}
+          </Text>
+
+          <Pressable
+            style={[styles.dnfButton, isDnf && styles.dnfButtonActive, { paddingVertical: s(8), marginBottom: s(20) }]}
+            onPress={handleToggleDnf}
+          >
+            <Text style={[styles.dnfButtonText, isDnf && styles.dnfButtonTextActive]}>
+              {isDnf ? "DNF — tap to undo" : "Mark DNF"}
+            </Text>
+          </Pressable>
+
+          <View style={[styles.penaltyRow, { marginBottom: s(20) }]}>
+            <Pressable
+              style={[
+                styles.penaltyButton,
+                { width: penaltyButtonSize, height: penaltyButtonSize, borderRadius: penaltyButtonSize / 2 },
+              ]}
+              disabled={penaltyCount === 0}
+              onPress={() => setPenaltyCount((count) => Math.max(0, count - 1))}
+            >
+              <Text style={styles.penaltyButtonText}>−</Text>
+            </Pressable>
+            <View style={styles.penaltyCountBox}>
+              <Text style={styles.penaltyCount}>{penaltyCount}</Text>
+              <Text style={styles.penaltyLabel}>penalties</Text>
+            </View>
+            <Pressable
+              style={[
+                styles.penaltyButton,
+                { width: penaltyButtonSize, height: penaltyButtonSize, borderRadius: penaltyButtonSize / 2 },
+              ]}
+              disabled={penaltyCount === MAX_PENALTIES}
+              onPress={() => setPenaltyCount((count) => Math.min(MAX_PENALTIES, count + 1))}
+            >
+              <Text style={styles.penaltyButtonText}>+</Text>
+            </Pressable>
+            <Pressable
+              style={styles.penaltyChip}
+              disabled={penaltyCount === MAX_PENALTIES}
+              onPress={() => setPenaltyCount((count) => Math.min(MAX_PENALTIES, count + 5))}
+            >
+              <Text style={styles.penaltyChipText}>+5</Text>
+            </Pressable>
+          </View>
+
+          <View style={[styles.keypad, { gap: s(10) }]}>
+            {KEYPAD_ROWS.map((row, rowIndex) => (
+              <View key={rowIndex} style={[styles.keypadRow, { gap: s(10) }]}>
+                {row.map((key, keyIndex) =>
+                  key === "" ? (
+                    <View
+                      key={keyIndex}
+                      style={[styles.keypadKey, { height: keypadKeyHeight }]}
+                    />
+                  ) : (
+                    <Pressable
+                      key={keyIndex}
+                      style={[styles.keypadKey, { height: keypadKeyHeight }]}
+                      disabled={isDnf}
+                      onPress={() => handleKeyPress(key)}
+                    >
+                      <Text style={styles.keypadKeyText}>{key === "back" ? "⌫" : key}</Text>
+                    </Pressable>
+                  ),
+                )}
+              </View>
+            ))}
+          </View>
+
+          {saveError && <Text style={styles.error}>{saveError}</Text>}
+          {lastSaved && !saveError && <Text style={styles.lastSaved}>Saved {lastSaved} ✓</Text>}
+
+          <Pressable
+            style={[
+              styles.saveButton,
+              { paddingVertical: Math.max(10, s(16)), marginTop: s(20), marginBottom: s(24) + insets.bottom },
+              !canSave && styles.saveButtonDisabled,
+            ]}
+            disabled={!canSave || saveMutation.isPending}
+            onPress={handleSave}
+          >
+            <Text style={styles.saveButtonText}>{saveMutation.isPending ? "Saving…" : "Save"}</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </View>
   );
