@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
@@ -29,10 +28,6 @@ export default function SquadRunnerScreen() {
       return data ?? null;
     },
   });
-
-  useEffect(() => {
-    api.POST("/events/{id}/entry-session/heartbeat", { params: { path: { id: eventId } } });
-  }, [eventId]);
 
   if (runnerQuery.isLoading) {
     return (
