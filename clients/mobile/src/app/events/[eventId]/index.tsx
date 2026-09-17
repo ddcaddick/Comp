@@ -7,10 +7,6 @@ import { api } from "@/lib/api";
 import { preferredName } from "@/lib/shooterName";
 import { colors, fonts } from "@/lib/theme";
 
-// A heartbeat older than this is treated as a stale, no-longer-relevant session rather
-// than someone actively entering right now.
-const RECENT_SESSION_MINUTES = 10;
-
 function errorDetail(error: unknown, fallback: string): string {
   const detail = (error as { detail?: string | null } | undefined)?.detail;
   return detail ?? fallback;
@@ -42,15 +38,6 @@ export default function SquadListScreen() {
       const { data, error } = await api.GET("/events/{id}/participants", { params: { path: { id: eventId } } });
       if (error) throw error;
       return data ?? [];
-    },
-  });
-
-  const sessionQuery = useQuery({
-    queryKey: ["entry-session", eventId],
-    queryFn: async () => {
-      const { data, error } = await api.GET("/events/{id}/entry-session", { params: { path: { id: eventId } } });
-      if (error) throw error;
-      return data ?? null;
     },
   });
 
@@ -124,12 +111,6 @@ export default function SquadListScreen() {
     onError: (err: Error) => setError(err.message),
   });
 
-  const session = sessionQuery.data;
-  const minutesAgo = session?.lastSeenAt
-    ? Math.round((Date.now() - new Date(session.lastSeenAt).getTime()) / 60_000)
-    : null;
-  const showSessionBanner = session?.displayName && minutesAgo !== null && minutesAgo < RECENT_SESSION_MINUTES;
-
   const participants = participantsQuery.data ?? [];
   // Earliest sign-on first -- shooters are meant to be allocated to squads in the order
   // they turned up, so the top of this list is who's been waiting longest.
@@ -155,14 +136,6 @@ export default function SquadListScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: true, title: name ?? "Squads" }} />
-
-      {showSessionBanner && (
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>
-            Last entered by {session!.displayName}, {minutesAgo === 0 ? "just now" : `${minutesAgo}m ago`}
-          </Text>
-        </View>
-      )}
 
       <View style={styles.statsBar}>
         <View style={styles.statItem}>
@@ -283,15 +256,6 @@ export default function SquadListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 20, paddingTop: 16 },
-  banner: {
-    backgroundColor: colors.errorBg,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  bannerText: { fontFamily: fonts.body, color: colors.accent, fontSize: 13 },
   statsBar: {
     flexDirection: "row",
     backgroundColor: colors.surface,
