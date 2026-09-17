@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   },
   statItem: { flex: 1, alignItems: "center" },
   statDivider: { width: 1, backgroundColor: colors.border },
-  statValue: { fontFamily: fonts.extrabold, fontSize: 20, color: colors.textPrimary },
+  statValue: { fontFamily: fonts.extrabold, fontSize: 20, color: colors.accent },
   statLabel: {
     fontFamily: fonts.monoBold,
     fontSize: 10,
