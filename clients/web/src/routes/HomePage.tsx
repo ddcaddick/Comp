@@ -130,9 +130,15 @@ function EventSection({
           >
             <div>
               <p className="text-sm font-semibold">{event.name}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {competitionNameById.get(event.competitionId) ?? "Competition"} · {event.eventDate} · {event.status}
-              </p>
+              {/* Fixed column widths, not one joined string, so competition/date/status
+                  each line up from row to row regardless of how long any one value is. */}
+              <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
+                <span className="w-24 shrink-0 truncate">
+                  {competitionNameById.get(event.competitionId) ?? "Competition"}
+                </span>
+                <span className="w-20 shrink-0">{event.eventDate}</span>
+                <span className="shrink-0">{event.status}</span>
+              </div>
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>

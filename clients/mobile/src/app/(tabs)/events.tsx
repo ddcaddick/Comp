@@ -89,9 +89,15 @@ export default function EventListScreen() {
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.rowTitle}>{item.name}</Text>
-              <Text style={styles.rowSubtitle}>
-                {competitionNameById.get(item.competitionId) ?? "Competition"} · {item.eventDate} · {item.status}
-              </Text>
+              <View style={styles.rowSubtitleRow}>
+                <Text style={[styles.rowSubtitle, styles.rowSubtitleCompetition]} numberOfLines={1}>
+                  {competitionNameById.get(item.competitionId) ?? "Competition"}
+                </Text>
+                <Text style={[styles.rowSubtitle, styles.rowSubtitleDate]}>{item.eventDate}</Text>
+                <Text style={[styles.rowSubtitle, styles.rowSubtitleStatus]} numberOfLines={1}>
+                  {item.status}
+                </Text>
+              </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
           </Pressable>
@@ -153,7 +159,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   rowTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.textPrimary },
-  rowSubtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+  // Fixed column widths (rather than one "competition · date · status" string) so each
+  // field lines up from row to row regardless of how long any one value is -- a longer
+  // competition name or status used to shove everything after it sideways.
+  rowSubtitleRow: { flexDirection: "row", marginTop: 4 },
+  rowSubtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.textSecondary },
+  rowSubtitleCompetition: { width: 92 },
+  rowSubtitleDate: { width: 78 },
+  rowSubtitleStatus: { flex: 1 },
   error: { color: colors.errorText, fontFamily: fonts.body, marginTop: 16 },
   empty: { textAlign: "center", color: colors.textSecondary, fontFamily: fonts.body, marginTop: 40 },
 });

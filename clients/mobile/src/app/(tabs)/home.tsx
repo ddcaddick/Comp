@@ -90,9 +90,14 @@ export default function HomeScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.rowTitle}>{item.name}</Text>
-                <Text style={styles.rowSubtitle}>
-                  {competitionNameById.get(item.competitionId) ?? "Competition"} · {item.status}
-                </Text>
+                <View style={styles.rowSubtitleRow}>
+                  <Text style={[styles.rowSubtitle, styles.rowSubtitleCompetition]} numberOfLines={1}>
+                    {competitionNameById.get(item.competitionId) ?? "Competition"}
+                  </Text>
+                  <Text style={styles.rowSubtitle} numberOfLines={1}>
+                    {item.status}
+                  </Text>
+                </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
             </Pressable>
@@ -135,7 +140,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   rowTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.textPrimary },
-  rowSubtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+  // Fixed competition-column width (rather than one "competition · status" string) so
+  // status lines up from row to row regardless of how long the competition name is.
+  rowSubtitleRow: { flexDirection: "row", marginTop: 4 },
+  rowSubtitle: { fontFamily: fonts.body, fontSize: 13, color: colors.textSecondary },
+  rowSubtitleCompetition: { width: 92 },
   error: { color: colors.errorText, fontFamily: fonts.body, marginTop: 16 },
   empty: { alignItems: "center", gap: 10, marginTop: 40 },
   emptyText: { textAlign: "center", color: colors.textSecondary, fontFamily: fonts.body },
