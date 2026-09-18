@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using Comp.Contracts.Auth;
 using Comp.Contracts.Competitions;
 using Comp.Contracts.Events;
+using Comp.Contracts.Leagues;
 using Comp.Contracts.Shooters;
 using Comp.Infrastructure;
 using Comp.Infrastructure.Identity;
@@ -196,6 +197,42 @@ public class CompetitionEndpointTests : IAsyncLifetime
         Assert.Equal(2, stats.TotalShooters);
         Assert.Equal(1.5m, stats.AverageShootersPerEvent);
         Assert.Equal(1, stats.EventsRemaining);
+        // No league was ever set up in this competition -- RosteredShooters is a roster
+        // count, entirely independent of who has actually shot an event.
+        Assert.Equal(0, stats.RosteredShooters);
+    }
+
+    [Fact]
+    public async Task Listing_competitions_reports_rostered_shooters_across_all_its_leagues()
+    {
+        using var superAdmin = await AuthenticatedClientAsync(Roles.SuperAdmin);
+        using var admin = await AuthenticatedClientAsync(Roles.Admin);
+
+        var competitionResponse = await superAdmin.PostAsJsonAsync("/competitions",
+            new { name = "Roster Season", year = 2032, startsOn = "2032-01-01", endsOn = "2032-12-31" });
+        var competitionId = (await competitionResponse.Content.ReadFromJsonAsync<CompetitionResponse>())!.Id;
+
+        var divisionOne = await CreateLeagueAsync(superAdmin, competitionId, "Division 1", tier: 1);
+        var divisionTwo = await CreateLeagueAsync(superAdmin, competitionId, "Division 2", tier: 2);
+
+        var shooterA = await CreateShooterAsync(admin, "Rostered", "InDivisionOne");
+        var shooterB = await CreateShooterAsync(admin, "Rostered", "InDivisionOne2");
+        var shooterC = await CreateShooterAsync(admin, "Rostered", "InDivisionTwo");
+        // Deliberately never added to any league -- must not be counted.
+        await CreateShooterAsync(admin, "Never", "Rostered");
+
+        (await superAdmin.PutAsJsonAsync($"/leagues/{divisionOne}/members",
+            new { shooterIds = new[] { shooterA.Id, shooterB.Id } })).EnsureSuccessStatusCode();
+        (await superAdmin.PutAsJsonAsync($"/leagues/{divisionTwo}/members",
+            new { shooterIds = new[] { shooterC.Id } })).EnsureSuccessStatusCode();
+
+        var competitions = await admin.GetFromJsonAsync<List<CompetitionResponse>>("/competitions");
+        var stats = competitions!.Single(c => c.Id == competitionId);
+
+        // Summed across both leagues (2 + 1), regardless of any event ever having been
+        // created -- rostering is independent of the event/scoring side entirely.
+        Assert.Equal(3, stats.RosteredShooters);
+        Assert.Equal(0, stats.TotalShooters);
     }
 
     private static string EmailFor(string role) => $"{role.ToLowerInvariant()}@example.com";
@@ -213,6 +250,18 @@ public class CompetitionEndpointTests : IAsyncLifetime
             new { competitionId, eventNumber, name = $"Event {eventNumber}", eventDate = "2031-01-07" });
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EventResponse>())!.Id;
+    }
+
+    private static async Task<Guid> CreateLeagueAsync(HttpClient client, Guid competitionId, string name, int tier)
+    {
+        var response = await client.PostAsJsonAsync($"/competitions/{competitionId}/leagues",
+            new
+            {
+                name, tier, pointsForFirst = (int?)null, pointsDecrement = (int?)null,
+                dropWorstCount = (int?)null, absencesCountAsZero = (bool?)null
+            });
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<LeagueResponse>())!.Id;
     }
 
     private static async Task<Guid> AddParticipantAsync(HttpClient client, Guid eventId, Guid shooterId)

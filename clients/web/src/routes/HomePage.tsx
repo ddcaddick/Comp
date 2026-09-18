@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
-import { Activity, CalendarDays, ChevronRight, History } from "lucide-react";
+import { Activity, CalendarDays, ChevronRight, History, Users } from "lucide-react";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { addDaysIso, todayIso } from "../lib/dates";
@@ -69,7 +70,7 @@ export function HomePage() {
 
       {!isLoading && !eventsQuery.isError && (
         <>
-          <div className="mb-8">
+          <div className="mb-8 grid gap-8 md:grid-cols-2">
             <EventSection
               icon={<Activity className="h-4 w-4" />}
               title="In Progress"
@@ -79,6 +80,7 @@ export function HomePage() {
               emptyText="No events in progress."
               onSelect={goToEvent}
             />
+            <CompetitionShootersChart competitions={competitionsQuery.data ?? []} />
           </div>
 
           <div className="grid gap-8 md:grid-cols-2">
@@ -167,6 +169,92 @@ function EventSection({
           <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
             {emptyText}
           </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// A vivid, saturated palette that reads clearly against the app's dark background --
+// distinct from the single muted orange accent used everywhere else, since a chart with
+// several same-hue slices would be unreadable.
+const CHART_COLORS = ["#ff8a3d", "#22d3ee", "#c084fc", "#4ade80", "#f472b6", "#facc15"];
+
+interface CompetitionRow {
+  id: string;
+  name: string;
+  rosteredShooters: number | string;
+}
+
+function CompetitionShootersChart({ competitions }: { competitions: CompetitionRow[] }) {
+  const data = competitions
+    .map((c) => ({ name: c.name, value: Number(c.rosteredShooters) }))
+    .filter((c) => c.value > 0);
+  const total = data.reduce((sum, d) => sum + d.value, 0);
+
+  return (
+    <div>
+      <div className="mb-1 flex items-center gap-2">
+        <span className="text-primary">
+          <Users className="h-4 w-4" />
+        </span>
+        <h2 className="text-base font-semibold">Shooters by Competition</h2>
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">Rostered across all leagues</p>
+
+      <div className="rounded-lg border border-border bg-background p-4">
+        {data.length === 0 ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">No shooters rostered yet.</p>
+        ) : (
+          <div className="flex items-center gap-6">
+            <div className="relative h-36 w-36 shrink-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={data}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius="65%"
+                    outerRadius="100%"
+                    paddingAngle={data.length > 1 ? 3 : 0}
+                    stroke="none"
+                  >
+                    {data.map((entry, index) => (
+                      <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#141519",
+                      border: "1px solid #2a2c33",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                    itemStyle={{ color: "#eef1f4" }}
+                    labelStyle={{ color: "#eef1f4" }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-xl font-bold">{total}</span>
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Shooters</span>
+              </div>
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              {data.map((entry, index) => (
+                <div key={entry.name} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                    />
+                    <span className="truncate">{entry.name}</span>
+                  </span>
+                  <span className="shrink-0 font-medium">{entry.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
