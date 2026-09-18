@@ -2232,6 +2232,8 @@ export interface components {
             averageShootersPerEvent: number | string;
             /** Format: int32 */
             eventsRemaining: number | string;
+            /** Format: int32 */
+            rosteredShooters: number | string;
         };
         CreateCompetitionRequest: {
             name: string;

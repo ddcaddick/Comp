@@ -63,11 +63,20 @@ public class CompetitionService(CompDbContext dbContext) : ICompetitionService
                 .ToListAsync(cancellationToken))
             .ToHashSet();
 
+        var rosteredCountByCompetition = (await dbContext.LeagueMemberships
+                .Where(m => competitionIds.Contains(m.CompetitionId))
+                .GroupBy(m => m.CompetitionId)
+                .Select(g => new { CompetitionId = g.Key, Count = g.Count() })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(x => x.CompetitionId, x => x.Count);
+
         var eventsByCompetition = events.ToLookup(e => e.CompetitionId);
         var participantsByEvent = participants.ToLookup(p => p.EventId);
 
         return competitions
-            .Select(c => BuildResponse(c, eventsByCompetition[c.Id], participantsByEvent, shotParticipantIds))
+            .Select(c => BuildResponse(
+                c, eventsByCompetition[c.Id], participantsByEvent, shotParticipantIds,
+                rosteredCountByCompetition.GetValueOrDefault(c.Id)))
             .ToList();
     }
 
@@ -111,14 +120,18 @@ public class CompetitionService(CompDbContext dbContext) : ICompetitionService
                 .ToListAsync(cancellationToken))
             .ToHashSet();
 
-        return BuildResponse(competition, events, participants.ToLookup(p => p.EventId), shotParticipantIds);
+        var rosteredCount = await dbContext.LeagueMemberships
+            .CountAsync(m => m.CompetitionId == competition.Id, cancellationToken);
+
+        return BuildResponse(competition, events, participants.ToLookup(p => p.EventId), shotParticipantIds, rosteredCount);
     }
 
     private static CompetitionResponse BuildResponse(
         Competition competition,
         IEnumerable<Event> competitionEvents,
         ILookup<Guid, EventParticipant> participantsByEvent,
-        HashSet<Guid> shotParticipantIds)
+        HashSet<Guid> shotParticipantIds,
+        int rosteredCount)
     {
         var eventsList = competitionEvents.ToList();
 
@@ -160,6 +173,7 @@ public class CompetitionService(CompDbContext dbContext) : ICompetitionService
             competition.Status.ToString(),
             shooterIdsWhoShot.Count,
             averagePerEvent,
-            eventsRemaining);
+            eventsRemaining,
+            rosteredCount);
     }
 }
