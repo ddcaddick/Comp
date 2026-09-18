@@ -2352,6 +2352,8 @@ export interface components {
             countsForStandings: boolean;
             /** Format: int32 */
             scoringRulesVersion: number | string;
+            /** Format: int32 */
+            shooterCount: number | string;
         };
         EventResultsResponse: {
             /** Format: uuid */
