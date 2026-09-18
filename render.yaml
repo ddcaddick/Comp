@@ -63,7 +63,10 @@ services:
   - type: web
     name: comp-web-staging
     runtime: static
-    buildCommand: cd clients && corepack enable && corepack prepare pnpm@12.4.1 --activate && pnpm install --frozen-lockfile && pnpm --filter web build
+    # `corepack enable` is deliberately omitted: it tries to relink the pnpm shim under
+    # /usr/bin, which is read-only on Render's Node 24 build image (EROFS). `prepare
+    # --activate` alone is enough -- it just points corepack's existing shim at this version.
+    buildCommand: cd clients && corepack prepare pnpm@12.4.1 --activate && pnpm install --frozen-lockfile && pnpm --filter web build
     staticPublishPath: clients/web/dist
     # React Router handles routing client-side -- without this, refreshing the browser on
     # anything but the exact root path (e.g. /home, /competitions/x/events) 404s, since
