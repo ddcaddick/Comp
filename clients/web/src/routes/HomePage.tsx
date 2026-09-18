@@ -51,7 +51,8 @@ export function HomePage() {
     .sort((a, b) => a.eventDate.localeCompare(b.eventDate));
   const recent = events
     .filter((e) => e.eventDate < today && e.eventDate >= recentStart)
-    .sort((a, b) => b.eventDate.localeCompare(a.eventDate));
+    .sort((a, b) => b.eventDate.localeCompare(a.eventDate))
+    .slice(0, 4);
 
   const isLoading = eventsQuery.isLoading || competitionsQuery.isLoading;
 
@@ -380,10 +381,10 @@ function EventAttendanceChart({
   );
 }
 
-// Progress made (vivid brand accent) vs. what's left (muted, deliberately not vivid) --
-// the same two-tone convention as a download or upload progress bar.
+// Same two vivid hues the other dashboard charts use, so "completed" and "remaining"
+// read as consistently coloured concepts across the whole dashboard, not just this chart.
 const TIMELINE_COMPLETED_COLOR = CHART_COLORS[0];
-const TIMELINE_REMAINING_COLOR = "#3a3d45";
+const TIMELINE_REMAINING_COLOR = CHART_COLORS[1];
 
 interface CompetitionTimelineRow {
   id: string;
