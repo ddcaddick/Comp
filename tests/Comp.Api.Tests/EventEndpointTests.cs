@@ -93,6 +93,7 @@ public class EventEndpointTests : IAsyncLifetime
         Assert.Equal("Draft", created!.Status);
         Assert.Equal(5.00m, created.PenaltySeconds); // default
         Assert.Equal(2, created.RunsPerShooter); // default
+        Assert.Equal(0, created.ShooterCount); // no participants yet
 
         using var officialClient = await AuthenticatedClientAsync(Roles.Official);
         var forbidden = await officialClient.PostAsJsonAsync("/events",
@@ -266,12 +267,55 @@ public class EventEndpointTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound, participantsAfter.StatusCode);
     }
 
+    [Fact]
+    public async Task Listing_events_reports_the_shooter_count_that_actually_shot_each_one()
+    {
+        var created = await CreateEventAsync(50, "Attendance");
+
+        var shooterA = await CreateShooterAsync("Alice", "ShotIt");
+        var shooterB = await CreateShooterAsync("Bob", "DnfIt");
+        var shooterC = await CreateShooterAsync("Carol", "NeverCalledUp");
+
+        var participantA = await AddParticipantAsync(created.Id, shooterA);
+        var participantB = await AddParticipantAsync(created.Id, shooterB);
+        await AddParticipantAsync(created.Id, shooterC);
+
+        (await _admin.PutAsJsonAsync($"/events/{created.Id}/participants/{participantA}/runs/1",
+            new { rawTimeMs = 90_000, penaltyCount = 0, isDnf = false })).EnsureSuccessStatusCode();
+        // DNF still counts as having shot -- only a participant with zero runs is excluded.
+        (await _admin.PutAsJsonAsync($"/events/{created.Id}/participants/{participantB}/runs/1",
+            new { rawTimeMs = (int?)null, penaltyCount = 0, isDnf = true })).EnsureSuccessStatusCode();
+
+        var listed = await _admin.GetFromJsonAsync<List<EventResponse>>($"/events?competitionId={_competitionId}");
+        Assert.Equal(2, listed!.Single(e => e.Id == created.Id).ShooterCount);
+
+        // The single-event response shape (create/update/transition/amend) reports the same
+        // count, not just the batched list endpoint.
+        var refetchedByTransition = await _admin.PostAsJsonAsync($"/events/{created.Id}/transition", new { to = "Setup" });
+        refetchedByTransition.EnsureSuccessStatusCode();
+        Assert.Equal(2, (await refetchedByTransition.Content.ReadFromJsonAsync<EventResponse>())!.ShooterCount);
+    }
+
     private async Task<EventResponse> CreateEventAsync(int eventNumber, string name)
     {
         var response = await _admin.PostAsJsonAsync("/events",
             new { competitionId = _competitionId, eventNumber, name, eventDate = "2040-01-07" });
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EventResponse>())!;
+    }
+
+    private async Task<Guid> CreateShooterAsync(string firstName, string lastName)
+    {
+        var response = await _admin.PostAsJsonAsync("/shooters", new { firstName, lastName });
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<ShooterResponse>())!.Id;
+    }
+
+    private async Task<Guid> AddParticipantAsync(Guid eventId, Guid shooterId)
+    {
+        var response = await _admin.PostAsJsonAsync($"/events/{eventId}/participants", new { shooterId });
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<EventParticipantResponse>())!.Id;
     }
 
     private static string EmailFor(string role) => $"{role.ToLowerInvariant()}@example.com";

@@ -44,7 +44,7 @@ public class EventService(CompDbContext dbContext, ICurrentUserAccessor currentU
         dbContext.Events.Add(@event);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return new EventCommandResult.Success(ToResponse(@event));
+        return new EventCommandResult.Success(await ToResponseAsync(@event, cancellationToken));
     }
 
     public async Task<IReadOnlyList<EventResponse>> ListAsync(
@@ -63,7 +63,26 @@ public class EventService(CompDbContext dbContext, ICurrentUserAccessor currentU
         }
 
         var events = await query.OrderBy(e => e.EventNumber).ToListAsync(cancellationToken);
-        return events.Select(ToResponse).ToList();
+        var eventIds = events.Select(e => e.Id).ToList();
+
+        var participants = await dbContext.EventParticipants
+            .Where(p => eventIds.Contains(p.EventId))
+            .ToListAsync(cancellationToken);
+        var participantIds = participants.Select(p => p.Id).ToList();
+
+        var shotParticipantIds = (await dbContext.Runs
+                .Where(r => participantIds.Contains(r.EventParticipantId))
+                .Select(r => r.EventParticipantId)
+                .Distinct()
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        var shooterCountByEvent = participants
+            .Where(p => shotParticipantIds.Contains(p.Id))
+            .ToLookup(p => p.EventId)
+            .ToDictionary(g => g.Key, g => g.Select(p => p.ShooterId).Distinct().Count());
+
+        return events.Select(e => ToResponse(e, shooterCountByEvent.GetValueOrDefault(e.Id))).ToList();
     }
 
     public async Task<EventCommandResult> UpdateAsync(Guid id, UpdateEventRequest request, CancellationToken cancellationToken)
@@ -86,7 +105,7 @@ public class EventService(CompDbContext dbContext, ICurrentUserAccessor currentU
         @event.CountsForStandings = request.CountsForStandings;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return new EventCommandResult.Success(ToResponse(@event));
+        return new EventCommandResult.Success(await ToResponseAsync(@event, cancellationToken));
     }
 
     public async Task<EventCommandResult> TransitionAsync(
@@ -124,7 +143,7 @@ public class EventService(CompDbContext dbContext, ICurrentUserAccessor currentU
             @event.FinalisedByUserId = RequireActorId();
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            return new EventCommandResult.Success(ToResponse(@event));
+            return new EventCommandResult.Success(await ToResponseAsync(@event, cancellationToken));
         }
 
         var currentIndex = Array.IndexOf(PreFinaliseChain, @event.Status);
@@ -138,7 +157,7 @@ public class EventService(CompDbContext dbContext, ICurrentUserAccessor currentU
         @event.Status = target;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return new EventCommandResult.Success(ToResponse(@event));
+        return new EventCommandResult.Success(await ToResponseAsync(@event, cancellationToken));
     }
 
     public async Task<EventCommandResult> AmendAsync(Guid id, AmendEventRequest request, CancellationToken cancellationToken)
@@ -165,7 +184,7 @@ public class EventService(CompDbContext dbContext, ICurrentUserAccessor currentU
         dbContext.PendingAuditReason = request.Reason;
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return new EventCommandResult.Success(ToResponse(@event));
+        return new EventCommandResult.Success(await ToResponseAsync(@event, cancellationToken));
     }
 
     public async Task<EventCommandResult> DeleteAsync(Guid id, CancellationToken cancellationToken)
@@ -209,7 +228,25 @@ public class EventService(CompDbContext dbContext, ICurrentUserAccessor currentU
     private Guid RequireActorId() =>
         currentUser.UserId ?? throw new InvalidOperationException("No authenticated user for this write.");
 
-    private static EventResponse ToResponse(Event @event) => new(
+    // Used by every single-event mutation, which each handle one event -- ListAsync has its
+    // own batched version of this same query shape to avoid N+1 round trips.
+    private async Task<EventResponse> ToResponseAsync(Event @event, CancellationToken cancellationToken)
+    {
+        var participantIds = await dbContext.EventParticipants
+            .Where(p => p.EventId == @event.Id)
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken);
+
+        var shooterCount = await dbContext.EventParticipants
+            .Where(p => participantIds.Contains(p.Id) && dbContext.Runs.Any(r => r.EventParticipantId == p.Id))
+            .Select(p => p.ShooterId)
+            .Distinct()
+            .CountAsync(cancellationToken);
+
+        return ToResponse(@event, shooterCount);
+    }
+
+    private static EventResponse ToResponse(Event @event, int shooterCount) => new(
         @event.Id,
         @event.CompetitionId,
         @event.EventNumber,
@@ -219,5 +256,6 @@ public class EventService(CompDbContext dbContext, ICurrentUserAccessor currentU
         @event.PenaltySeconds,
         @event.RunsPerShooter,
         @event.CountsForStandings,
-        @event.ScoringRulesVersion);
+        @event.ScoringRulesVersion,
+        shooterCount);
 }
