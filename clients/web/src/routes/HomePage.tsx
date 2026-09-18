@@ -1,18 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { Activity, BarChart3, CalendarDays, ChevronRight, GanttChart, History, Users } from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  Cell,
-  Pie,
-  PieChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { addDaysIso, todayIso } from "../lib/dates";
@@ -40,7 +29,11 @@ export function HomePage() {
     },
   });
 
-  const competitionNameById = new Map((competitionsQuery.data ?? []).map((c) => [c.id, c.name]));
+  const competitions = competitionsQuery.data ?? [];
+  const competitionNameById = new Map(competitions.map((c) => [c.id, c.name]));
+  // Shared by every chart below so the same competition is always the same colour,
+  // regardless of which chart it appears in.
+  const competitionColorById = new Map(competitions.map((c, index) => [c.id, CHART_COLORS[index % CHART_COLORS.length]]));
 
   const today = todayIso();
   const upcomingEnd = addDaysIso(today, 7);
@@ -82,9 +75,9 @@ export function HomePage() {
       {!isLoading && !eventsQuery.isError && (
         <>
           <div className="mb-8 grid gap-8 md:grid-cols-3">
-            <CompetitionShootersChart competitions={competitionsQuery.data ?? []} />
-            <EventAttendanceChart events={events} competitionNameById={competitionNameById} />
-            <CompetitionTimelineChart competitions={competitionsQuery.data ?? []} />
+            <CompetitionShootersChart competitions={competitions} colorById={competitionColorById} />
+            <EventAttendanceChart events={events} competitions={competitions} colorById={competitionColorById} />
+            <CompetitionTimelineChart competitions={competitions} events={events} />
           </div>
 
           <div className="grid gap-8 md:grid-cols-3">
@@ -200,9 +193,15 @@ interface CompetitionRow {
   rosteredShooters: number | string;
 }
 
-function CompetitionShootersChart({ competitions }: { competitions: CompetitionRow[] }) {
+function CompetitionShootersChart({
+  competitions,
+  colorById,
+}: {
+  competitions: CompetitionRow[];
+  colorById: Map<string, string>;
+}) {
   const data = competitions
-    .map((c) => ({ name: c.name, value: Number(c.rosteredShooters) }))
+    .map((c) => ({ id: c.id, name: c.name, value: Number(c.rosteredShooters) }))
     .filter((c) => c.value > 0);
   const total = data.reduce((sum, d) => sum + d.value, 0);
 
@@ -233,8 +232,8 @@ function CompetitionShootersChart({ competitions }: { competitions: CompetitionR
                     paddingAngle={data.length > 1 ? 3 : 0}
                     stroke="none"
                   >
-                    {data.map((entry, index) => (
-                      <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    {data.map((entry) => (
+                      <Cell key={entry.id} fill={colorById.get(entry.id) ?? CHART_COLORS[0]} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -255,12 +254,12 @@ function CompetitionShootersChart({ competitions }: { competitions: CompetitionR
               </div>
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-2">
-              {data.map((entry, index) => (
-                <div key={entry.name} className="flex items-center justify-between gap-2 text-sm">
+              {data.map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between gap-2 text-sm">
                   <span className="flex min-w-0 items-center gap-2">
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                      style={{ backgroundColor: colorById.get(entry.id) ?? CHART_COLORS[0] }}
                     />
                     <span className="truncate">{entry.name}</span>
                   </span>
@@ -286,45 +285,50 @@ const TOOLTIP_STYLE = {
   labelStyle: { color: "#eef1f4" },
 };
 
-// Plain YYYY-MM-DD -> "12 Jan", for compact bar-chart axis labels. Parsed as UTC so the
-// same calendar date never shifts a day depending on the viewer's timezone.
-function formatShortDate(iso: string): string {
-  const [year, month, day] = iso.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
-}
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 interface EventAttendanceRow {
-  id: string;
-  name: string;
   eventDate: string;
   competitionId: string;
   shooterCount: number | string;
 }
 
+interface AttendanceCompetition {
+  id: string;
+  name: string;
+}
+
 function EventAttendanceChart({
   events,
-  competitionNameById,
+  competitions,
+  colorById,
 }: {
   events: EventAttendanceRow[];
-  competitionNameById: Map<string, string>;
+  competitions: AttendanceCompetition[];
+  colorById: Map<string, string>;
 }) {
-  // Only events that actually happened -- a future or empty event has nothing to plot --
-  // then the most recent handful, oldest to newest, so the bars read left-to-right as a
-  // trend rather than a random jumble.
-  const data = events
-    .filter((e) => Number(e.shooterCount) > 0)
-    .sort((a, b) => a.eventDate.localeCompare(b.eventDate))
-    .slice(-8)
-    .map((e) => ({
-      eventName: e.name,
-      date: formatShortDate(e.eventDate),
-      shooters: Number(e.shooterCount),
-      competition: competitionNameById.get(e.competitionId) ?? "Competition",
-    }));
+  // Only competitions that have actually shot at least one event get a stack segment and a
+  // legend entry -- a competition that's only ever been rostered, never shot, would
+  // otherwise clutter the legend with a colour that never appears in any bar.
+  const shotEvents = events.filter((e) => Number(e.shooterCount) > 0);
+  const activeCompetitionIds = new Set(shotEvents.map((e) => e.competitionId));
+  const activeCompetitions = competitions.filter((c) => activeCompetitionIds.has(c.id));
+
+  // One row per calendar month, regardless of year -- a club runs the same Jan-Dec season
+  // shape every year, so folding every year's events onto the same 12 buckets is what makes
+  // "where are we in the season" visible at a glance.
+  const monthly = MONTH_LABELS.map((month) => {
+    const row: Record<string, string | number> = { month };
+    activeCompetitions.forEach((c) => {
+      row[c.id] = 0;
+    });
+    return row;
+  });
+  shotEvents.forEach((e) => {
+    const monthIndex = Number(e.eventDate.slice(5, 7)) - 1;
+    const row = monthly[monthIndex];
+    row[e.competitionId] = Number(row[e.competitionId] ?? 0) + Number(e.shooterCount);
+  });
 
   return (
     <div>
@@ -334,17 +338,17 @@ function EventAttendanceChart({
         </span>
         <h2 className="text-base font-semibold">Attendance</h2>
       </div>
-      <p className="mb-3 text-xs text-muted-foreground">Shooters per event, most recent {data.length}</p>
+      <p className="mb-3 text-xs text-muted-foreground">Shooters per month, by competition</p>
 
       <div className="rounded-lg border border-border bg-background p-4">
-        {data.length === 0 ? (
+        {activeCompetitions.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">No events have been shot yet.</p>
         ) : (
-          <div className="h-48 w-full">
+          <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <BarChart data={monthly} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <XAxis
-                  dataKey="date"
+                  dataKey="month"
                   tick={{ fontSize: 11, fill: "#8b8f99" }}
                   axisLine={{ stroke: "#2a2c33" }}
                   tickLine={false}
@@ -354,15 +358,19 @@ function EventAttendanceChart({
                   tick={{ fontSize: 11, fill: "#8b8f99" }}
                   axisLine={false}
                   tickLine={false}
-                  width={28}
+                  width={32}
                 />
-                <Tooltip
-                  {...TOOLTIP_STYLE}
-                  cursor={{ fill: "#ffffff0d" }}
-                  formatter={(value) => [value, "Shooters"]}
-                  labelFormatter={(_, payload) => payload?.[0]?.payload?.eventName ?? ""}
-                />
-                <Bar dataKey="shooters" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
+                <Tooltip {...TOOLTIP_STYLE} cursor={{ fill: "#ffffff0d" }} />
+                <Legend wrapperStyle={{ fontSize: 11, color: "#8b8f99", paddingTop: 8 }} />
+                {activeCompetitions.map((c) => (
+                  <Bar
+                    key={c.id}
+                    dataKey={c.id}
+                    name={c.name}
+                    stackId="attendance"
+                    fill={colorById.get(c.id) ?? CHART_COLORS[0]}
+                  />
+                ))}
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -372,53 +380,41 @@ function EventAttendanceChart({
   );
 }
 
-// Vivid for a season that's actually running, cooler for one not started yet, and
-// deliberately muted (not vivid) for one already closed -- so the eye goes to what's live.
-const TIMELINE_STATUS_COLORS: Record<string, string> = {
-  Active: CHART_COLORS[0],
-  Planning: CHART_COLORS[1],
-  Closed: "#4b4f58",
-};
-
-function isoToDayNumber(iso: string): number {
-  const [year, month, day] = iso.split("-").map(Number);
-  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
-}
-
-function formatAxisMonth(day: number): string {
-  return new Date(day * 86_400_000).toLocaleDateString(undefined, {
-    month: "short",
-    year: "2-digit",
-    timeZone: "UTC",
-  });
-}
-
-function formatFullDate(day: number): string {
-  return new Date(day * 86_400_000).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
+// Progress made (vivid brand accent) vs. what's left (muted, deliberately not vivid) --
+// the same two-tone convention as a download or upload progress bar.
+const TIMELINE_COMPLETED_COLOR = CHART_COLORS[0];
+const TIMELINE_REMAINING_COLOR = "#3a3d45";
 
 interface CompetitionTimelineRow {
   id: string;
   name: string;
-  status: string;
-  startsOn: string;
-  endsOn: string;
+  eventsRemaining: number | string;
 }
 
-function CompetitionTimelineChart({ competitions }: { competitions: CompetitionTimelineRow[] }) {
-  const todayDay = isoToDayNumber(todayIso());
+interface TimelineEventRow {
+  competitionId: string;
+}
+
+function CompetitionTimelineChart({
+  competitions,
+  events,
+}: {
+  competitions: CompetitionTimelineRow[];
+  events: TimelineEventRow[];
+}) {
+  const totalEventsById = new Map<string, number>();
+  events.forEach((e) => {
+    totalEventsById.set(e.competitionId, (totalEventsById.get(e.competitionId) ?? 0) + 1);
+  });
+
   const data = competitions
-    .map((c) => ({
-      name: c.name,
-      status: c.status,
-      range: [isoToDayNumber(c.startsOn), isoToDayNumber(c.endsOn)] as [number, number],
-    }))
-    .sort((a, b) => a.range[0] - b.range[0]);
+    .map((c) => {
+      const total = totalEventsById.get(c.id) ?? 0;
+      const completed = Math.min(total, Math.max(0, total - Number(c.eventsRemaining)));
+      return { name: c.name, completed, remaining: total - completed, total };
+    })
+    .filter((row) => row.total > 0)
+    .sort((a, b) => b.total - a.total);
 
   return (
     <div>
@@ -428,19 +424,29 @@ function CompetitionTimelineChart({ competitions }: { competitions: CompetitionT
         </span>
         <h2 className="text-base font-semibold">Season Timeline</h2>
       </div>
-      <p className="mb-3 text-xs text-muted-foreground">Competition start-to-end spans</p>
+      <p className="mb-3 text-xs text-muted-foreground">Events completed vs. remaining, per competition</p>
+
+      <div className="mb-3 flex items-center gap-4 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: TIMELINE_COMPLETED_COLOR }} />
+          Completed
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: TIMELINE_REMAINING_COLOR }} />
+          Remaining
+        </span>
+      </div>
 
       <div className="rounded-lg border border-border bg-background p-4">
         {data.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">No competitions yet.</p>
+          <p className="py-10 text-center text-sm text-muted-foreground">No events yet.</p>
         ) : (
           <div style={{ height: Math.max(data.length * 36, 96) }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 0 }}>
                 <XAxis
                   type="number"
-                  domain={["dataMin", "dataMax"]}
-                  tickFormatter={formatAxisMonth}
+                  allowDecimals={false}
                   tick={{ fontSize: 10, fill: "#8b8f99" }}
                   axisLine={{ stroke: "#2a2c33" }}
                   tickLine={false}
@@ -456,17 +462,10 @@ function CompetitionTimelineChart({ competitions }: { competitions: CompetitionT
                 <Tooltip
                   {...TOOLTIP_STYLE}
                   cursor={{ fill: "#ffffff0d" }}
-                  formatter={(value) => {
-                    const [start, end] = value as [number, number];
-                    return [`${formatFullDate(start)} - ${formatFullDate(end)}`, "Season"];
-                  }}
+                  formatter={(value, name) => [`${value} events`, name]}
                 />
-                <ReferenceLine x={todayDay} stroke="#eef1f4" strokeDasharray="4 4" />
-                <Bar dataKey="range" radius={[4, 4, 4, 4]} barSize={14}>
-                  {data.map((entry) => (
-                    <Cell key={entry.name} fill={TIMELINE_STATUS_COLORS[entry.status] ?? CHART_COLORS[0]} />
-                  ))}
-                </Bar>
+                <Bar dataKey="completed" name="Completed" stackId="progress" fill={TIMELINE_COMPLETED_COLOR} />
+                <Bar dataKey="remaining" name="Remaining" stackId="progress" fill={TIMELINE_REMAINING_COLOR} />
               </BarChart>
             </ResponsiveContainer>
           </div>
